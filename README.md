@@ -8,7 +8,7 @@ AI Intern Assessment submission project. This web app lets a user upload a recei
 - Extract required receipt fields using Gemini Vision
 - Auto-fill an editable form with extracted values
 - Validate required fields before submission
-- Submit data to local browser state/localStorage
+- Submit data to browser localStorage
 - Show final submitted JSON
 - Vercel-ready Next.js project
 
@@ -47,10 +47,10 @@ Then add your Gemini API key:
 
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-`GEMINI_MODEL` is optional. If omitted, the app uses `gemini-1.5-flash`.
+`GEMINI_MODEL` is optional. If omitted, the app uses `gemini-2.5-flash`.
 
 ### 3. Run locally
 
@@ -72,13 +72,14 @@ http://localhost:3000
 4. Gemini returns strict JSON containing merchant name, date, total amount, and currency.
 5. The app validates and displays the extracted fields in an editable form.
 6. The user reviews, corrects if needed, and submits the form.
+7. The final submission is saved in browser localStorage and displayed as JSON.
 
 ## Model Used
 
 Default model:
 
 ```text
-gemini-1.5-flash
+gemini-2.5-flash
 ```
 
 The model can be changed with:
@@ -86,6 +87,8 @@ The model can be changed with:
 ```bash
 GEMINI_MODEL=your_model_name
 ```
+
+Gemini 2.5 Flash was selected because it supports image input and text output, which fits receipt image extraction.
 
 ## Prompt Used
 

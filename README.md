@@ -11,6 +11,7 @@ AI Intern Assessment submission project. This web app lets a user upload a recei
 - Submit data to browser localStorage
 - Show final submitted JSON
 - Vercel-ready Next.js project
+- Automated unit, API, UI, E2E, and CI checks
 
 ## Required Fields Extracted
 
@@ -26,6 +27,9 @@ AI Intern Assessment submission project. This web app lets a user upload a recei
 - Tailwind CSS
 - Gemini API via server-side API route
 - Zod for response validation
+- Vitest and React Testing Library for unit/API/UI tests
+- Playwright for E2E tests
+- GitHub Actions for CI
 
 ## Getting Started
 
@@ -63,6 +67,28 @@ Open:
 ```text
 http://localhost:3000
 ```
+
+## Testing
+
+Run the fast delivery gate:
+
+```bash
+npm run ci
+```
+
+Run the full local gate including Playwright E2E:
+
+```bash
+npm run test:all
+```
+
+Install Playwright browsers before the first E2E run:
+
+```bash
+npx playwright install
+```
+
+See [`TESTING.md`](./TESTING.md) for the full testing strategy, coverage, manual QA checklist, and deployment checks.
 
 ## How It Works
 

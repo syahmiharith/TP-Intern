@@ -13,7 +13,8 @@
     "test:unit": "vitest run tests/unit",
     "test:api": "vitest run tests/api",
     "test:ui": "vitest run tests/ui",
-    "test:e2e": "playwright test",
+    "test:e2e": "node tests/e2e/run-e2e.mjs",
+    "test:e2e:live": "node tests/e2e/run-e2e.mjs --live tests/e2e/live-gemini.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:all": "npm run lint && npm run typecheck && npm run build && npm run test && npm run test:e2e",
     "ci": "npm run lint && npm run typecheck && npm run build && npm run test"

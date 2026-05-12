@@ -13,6 +13,7 @@ This project includes a layered test suite designed to reduce delivery chaos bef
 | API tests | `npm run test:api` | Test `/api/extract-receipt` with mocked Gemini responses. |
 | UI tests | `npm run test:ui` | Test upload, extraction states, editable form, validation, and localStorage. |
 | E2E tests | `npm run test:e2e` | Test full browser flows using Playwright. |
+| Live Gemini E2E smoke | `npm run test:e2e:live` | Optional real Gemini smoke that loads local env files and calls Gemini. |
 | Full local gate | `npm run test:all` | Run all quality gates and E2E tests. |
 
 ## Recommended Pre-Submission Command
@@ -122,6 +123,12 @@ Covers:
 - Required field validation
 
 The E2E tests mock the extraction API. This keeps tests deterministic and avoids failures caused by network/API issues.
+
+The live Gemini smoke test is intentionally separate from the default E2E command. It loads `GEMINI_API_KEY` and `GEMINI_MODEL` from the repo's local env files. Run it only when you want to spend a real Gemini request:
+
+```bash
+npm run test:e2e:live
+```
 
 ## Manual QA Still Required
 

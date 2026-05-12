@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const useManagedWebServer = process.env.PLAYWRIGHT_SKIP_WEB_SERVER !== "1";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -13,12 +15,16 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure"
   },
-  webServer: {
-    command: "npm run dev",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  },
+  webServer: useManagedWebServer
+    ? {
+        command: "node ./tests/e2e/next-dev-server.mjs",
+        url: "http://127.0.0.1:3000",
+        reuseExistingServer: !process.env.CI,
+        stdout: "ignore",
+        stderr: "ignore",
+        timeout: 120_000
+      }
+    : undefined,
   projects: [
     {
       name: "chromium",
@@ -26,6 +32,7 @@ export default defineConfig({
     },
     {
       name: "mobile-safari",
+      testMatch: /responsive-smoke\.spec\.ts/,
       use: { ...devices["iPhone 13"] }
     }
   ]

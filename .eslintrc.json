@@ -1,3 +1,4 @@
 {
+  "ignorePatterns": ["next-env.d.ts"],
   "extends": ["next/core-web-vitals", "next/typescript"]
 }

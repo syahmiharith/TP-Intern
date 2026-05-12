@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/extract-receipt/route";
+import { resetReceiptExtractionRateLimitForTests } from "@/lib/rate-limit";
 
 const originalEnv = process.env;
 
-function createRequest(file?: File) {
+function createRequest(file?: File, headers?: Record<string, string>) {
   if (file && typeof file.arrayBuffer !== "function") {
     Object.defineProperty(file, "arrayBuffer", {
       value: async () => new ArrayBuffer(file.size)
@@ -11,6 +12,7 @@ function createRequest(file?: File) {
   }
 
   return {
+    headers: new Headers(headers),
     formData: async () =>
       ({
         get: (name: string) => (name === "receipt" ? file ?? null : null)
@@ -48,6 +50,7 @@ async function readJson(response: Response) {
 describe("POST /api/extract-receipt", () => {
   beforeEach(() => {
     vi.resetModules();
+    resetReceiptExtractionRateLimitForTests();
     process.env = { ...originalEnv };
   });
 
@@ -173,6 +176,34 @@ describe("POST /api/extract-receipt", () => {
 
     expect(response.status).toBe(429);
     expect(body.error).toBe("Rate limit exceeded");
+  });
+
+  it("rate limits repeated extraction requests from the same client IP", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    mockGeminiResponse(
+      JSON.stringify({
+        merchantName: "FamilyMart",
+        date: "2026-05-11",
+        totalAmount: 12000,
+        currency: "KRW",
+        confidence: "high",
+        notes: []
+      })
+    );
+
+    const headers = { "x-forwarded-for": "203.0.113.10" };
+
+    for (let index = 0; index < 5; index += 1) {
+      const response = await POST(createRequest(createImageFile(`receipt-${index}.png`), headers));
+      expect(response.status).toBe(200);
+    }
+
+    const response = await POST(createRequest(createImageFile("receipt-6.png"), headers));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(429);
+    expect(body.error).toContain("Rate limit exceeded");
+    expect(fetch).toHaveBeenCalledTimes(5);
   });
 
   it("returns 500 when Gemini returns invalid JSON", async () => {

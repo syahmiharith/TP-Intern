@@ -81,6 +81,7 @@ Covers:
 - Successful Gemini JSON extraction
 - Gemini JSON wrapped in markdown fences
 - Gemini API failure handling
+- Per-IP extraction rate limiting
 - Invalid Gemini text response handling
 
 The API tests mock `fetch`, so they do not spend API credits or depend on Gemini uptime.

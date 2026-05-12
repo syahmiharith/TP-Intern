@@ -1,4 +1,5 @@
 import { receiptExtractionSchema } from "@/lib/receipt";
+import { checkReceiptExtractionRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -76,6 +77,11 @@ export async function POST(request: Request) {
         },
         500
       );
+    }
+
+    const rateLimitResponse = checkReceiptExtractionRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
     }
 
     const formData = await request.formData();

@@ -8,7 +8,7 @@ export type MockExtraction = {
   totalAmount: number | null;
   currency: string | null;
   confidence: Confidence;
-  notes: string[];
+  warnings: string[];
 };
 
 type MockRouteOptions = {
@@ -44,7 +44,7 @@ export const highConfidenceExtraction: MockExtraction = {
   totalAmount: 12000,
   currency: "KRW",
   confidence: "high",
-  notes: ["Clear receipt image."]
+  warnings: ["Clear receipt image."]
 };
 
 export const mediumConfidenceExtraction: MockExtraction = {
@@ -53,7 +53,7 @@ export const mediumConfidenceExtraction: MockExtraction = {
   totalAmount: 8.9,
   currency: "MYR",
   confidence: "medium",
-  notes: ["Currency inferred from receipt symbol."]
+  warnings: ["Currency inferred from receipt symbol."]
 };
 
 export const lowConfidenceExtraction: MockExtraction = {
@@ -62,7 +62,7 @@ export const lowConfidenceExtraction: MockExtraction = {
   totalAmount: null,
   currency: null,
   confidence: "low",
-  notes: ["Receipt is blurry. Please verify all fields."]
+  warnings: ["Receipt is blurry. Please verify all fields."]
 };
 
 export function extractButton(page: Page) {
@@ -227,7 +227,10 @@ export async function expectLatestSubmission(
   await expect(page.getByText(/receipt data submitted successfully/i)).toBeVisible();
   await expect(page.locator("pre")).toContainText(expected.merchantName);
   await expect(page.locator("pre")).toContainText(expected.currency);
-  await expect(readLatestSubmission(page)).resolves.toEqual(expected);
+  await expect(readLatestSubmission(page)).resolves.toMatchObject({
+    sourceFileName: expect.any(String),
+    data: expected
+  });
 }
 
 export async function createGeneratedReceiptPng(page: Page) {

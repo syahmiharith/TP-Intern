@@ -35,6 +35,9 @@ jobs:
       - name: Run unit, API, and UI tests
         run: npm run test
 
+      - name: Audit production dependencies
+        run: npm run audit:prod
+
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest

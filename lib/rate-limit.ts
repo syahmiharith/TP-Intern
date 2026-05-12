@@ -21,6 +21,7 @@ export function checkReceiptExtractionRateLimit(request: Request) {
   if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
     return Response.json(
       {
+        code: "RATE_LIMITED",
         error: "Rate limit exceeded. Please wait before extracting another receipt."
       },
       { status: 429 }

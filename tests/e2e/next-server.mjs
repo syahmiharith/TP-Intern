@@ -19,8 +19,11 @@ export async function startNextServer({ port = 3000, hostname = "127.0.0.1" } = 
     });
   });
 
+  const address = server.address();
+  const actualPort = typeof address === "object" && address ? address.port : port;
+
   return {
-    url: `http://${hostname}:${port}`,
+    url: `http://${hostname}:${actualPort}`,
     async close() {
       await new Promise((resolve, reject) => {
         server.close((error) => {

@@ -18,11 +18,12 @@ if (isLiveRun) {
   process.env.RUN_LIVE_GEMINI_E2E = "1";
 }
 
-const server = await startNextServer();
+const server = await startNextServer({ port: Number(process.env.PORT || 0) });
 const playwrightCli = join(projectDir, "node_modules", "playwright", "cli.js");
 const args = [playwrightCli, "test", ...playwrightArgs];
 const childEnv = {
   ...process.env,
+  PLAYWRIGHT_BASE_URL: server.url,
   PLAYWRIGHT_SKIP_WEB_SERVER: "1",
   RUN_LIVE_GEMINI_E2E: isLiveRun ? "1" : process.env.RUN_LIVE_GEMINI_E2E
 };

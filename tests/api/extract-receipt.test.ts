@@ -17,11 +17,25 @@ function createRequest(file?: File, headers?: Record<string, string>) {
       ({
         get: (name: string) => (name === "receipt" ? file ?? null : null)
       }) as FormData
-  } as Request;
+  } as unknown as Request;
+}
+
+function createBrokenRequest() {
+  return {
+    headers: new Headers(),
+    formData: async () => {
+      throw new Error("internal parser detail");
+    }
+  } as unknown as Request;
 }
 
 function createImageFile(name = "receipt.png", content = "fake image content") {
   return new File([content], name, { type: "image/png" });
+}
+
+function createReceiptFile(type: string, name = "receipt") {
+  const extension = type.split("/")[1]?.replace("jpeg", "jpg") || "bin";
+  return new File(["fake image content"], `${name}.${extension}`, { type });
 }
 
 function mockGeminiResponse(text: string) {
@@ -44,7 +58,7 @@ function mockGeminiResponse(text: string) {
 }
 
 async function readJson(response: Response) {
-  return response.json() as Promise<{ data?: unknown; error?: string }>;
+  return response.json() as Promise<{ data?: unknown; code?: string; error?: string }>;
 }
 
 describe("POST /api/extract-receipt", () => {
@@ -67,7 +81,8 @@ describe("POST /api/extract-receipt", () => {
     const body = await readJson(response);
 
     expect(response.status).toBe(500);
-    expect(body.error).toContain("Missing GEMINI_API_KEY");
+    expect(body.code).toBe("AI_PROVIDER_ERROR");
+    expect(body.error).toBe("Receipt extraction is not configured. Please contact the project owner.");
   });
 
   it("returns 400 when no file is uploaded", async () => {
@@ -77,6 +92,7 @@ describe("POST /api/extract-receipt", () => {
     const body = await readJson(response);
 
     expect(response.status).toBe(400);
+    expect(body.code).toBe("NO_RECEIPT_UPLOADED");
     expect(body.error).toBe("No receipt image was uploaded.");
   });
 
@@ -88,7 +104,42 @@ describe("POST /api/extract-receipt", () => {
     const body = await readJson(response);
 
     expect(response.status).toBe(400);
-    expect(body.error).toContain("Only image receipts are supported");
+    expect(body.code).toBe("INVALID_FILE_TYPE");
+    expect(body.error).toContain("Only JPG, PNG, or WEBP");
+  });
+
+  it.each(["image/svg+xml", "image/gif"])("rejects unsupported image MIME type: %s", async (mimeType) => {
+    process.env.GEMINI_API_KEY = "test-key";
+
+    const response = await POST(createRequest(createReceiptFile(mimeType)));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("INVALID_FILE_TYPE");
+    expect(body.error).toContain("Only JPG, PNG, or WEBP");
+  });
+
+  it.each(["image/jpeg", "image/png", "image/webp"])("accepts supported image MIME type: %s", async (mimeType) => {
+    process.env.GEMINI_API_KEY = "test-key";
+    mockGeminiResponse(
+      JSON.stringify({
+        merchantName: "FamilyMart",
+        date: "2026-05-11",
+        totalAmount: 12000,
+        currency: "KRW",
+        confidence: "high",
+        warnings: []
+      })
+    );
+
+    const response = await POST(createRequest(createReceiptFile(mimeType)));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      merchantName: "FamilyMart",
+      currency: "KRW"
+    });
   });
 
   it("returns 400 for images larger than 5MB", async () => {
@@ -101,6 +152,7 @@ describe("POST /api/extract-receipt", () => {
     const body = await readJson(response);
 
     expect(response.status).toBe(400);
+    expect(body.code).toBe("FILE_TOO_LARGE");
     expect(body.error).toBe("Receipt image must be 5MB or smaller.");
   });
 
@@ -113,7 +165,7 @@ describe("POST /api/extract-receipt", () => {
         totalAmount: 12000,
         currency: "KRW",
         confidence: "high",
-        notes: []
+        warnings: []
       })
     );
 
@@ -127,7 +179,7 @@ describe("POST /api/extract-receipt", () => {
       totalAmount: 12000,
       currency: "KRW",
       confidence: "high",
-      notes: []
+      warnings: []
     });
   });
 
@@ -140,7 +192,7 @@ describe("POST /api/extract-receipt", () => {
   "totalAmount": 8.9,
   "currency": "MYR",
   "confidence": "medium",
-  "notes": ["Currency inferred from receipt symbol."]
+  "warnings": ["Currency inferred from receipt symbol."]
 }
 \`\`\``);
 
@@ -154,7 +206,37 @@ describe("POST /api/extract-receipt", () => {
       totalAmount: 8.9,
       currency: "MYR",
       confidence: "medium",
-      notes: ["Currency inferred from receipt symbol."]
+      warnings: ["Currency inferred from receipt symbol."]
+    });
+  });
+
+  it("normalizes partial Gemini responses and returns warnings", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    mockGeminiResponse(
+      JSON.stringify({
+        merchantName: "  Starbucks  ",
+        date: null,
+        totalAmount: "MYR 18.90",
+        currency: "rm",
+        confidence: "medium",
+        warnings: ["Date is unreadable."]
+      })
+    );
+
+    const response = await POST(createRequest(createImageFile()));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(body.data).toEqual({
+      merchantName: "Starbucks",
+      date: null,
+      totalAmount: 18.9,
+      currency: "MYR",
+      confidence: "medium",
+      warnings: [
+        "Date is unreadable.",
+        "Date could not be confidently extracted. Please enter it manually."
+      ]
     });
   });
 
@@ -175,7 +257,37 @@ describe("POST /api/extract-receipt", () => {
     const body = await readJson(response);
 
     expect(response.status).toBe(429);
+    expect(body.code).toBe("AI_PROVIDER_ERROR");
     expect(body.error).toBe("Rate limit exceeded");
+  });
+
+  it("returns a structured timeout error when Gemini aborts", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw Object.assign(new Error("aborted"), { name: "AbortError" });
+      })
+    );
+
+    const response = await POST(createRequest(createImageFile()));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(504);
+    expect(body.code).toBe("AI_PROVIDER_ERROR");
+    expect(body.error).toBe("Gemini extraction timed out. Please try again.");
+  });
+
+  it("returns a safe public message for unexpected failures", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+
+    const response = await POST(createBrokenRequest());
+    const body = await readJson(response);
+
+    expect(response.status).toBe(500);
+    expect(body.code).toBe("UNKNOWN_ERROR");
+    expect(body.error).toBe("Receipt extraction failed. Please try again with a clearer image.");
+    expect(body.error).not.toContain("internal parser detail");
   });
 
   it("rate limits repeated extraction requests from the same client IP", async () => {
@@ -187,7 +299,7 @@ describe("POST /api/extract-receipt", () => {
         totalAmount: 12000,
         currency: "KRW",
         confidence: "high",
-        notes: []
+        warnings: []
       })
     );
 
@@ -202,18 +314,20 @@ describe("POST /api/extract-receipt", () => {
     const body = await readJson(response);
 
     expect(response.status).toBe(429);
+    expect(body.code).toBe("RATE_LIMITED");
     expect(body.error).toContain("Rate limit exceeded");
     expect(fetch).toHaveBeenCalledTimes(5);
   });
 
-  it("returns 500 when Gemini returns invalid JSON", async () => {
+  it("returns 502 when Gemini returns invalid JSON", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     mockGeminiResponse("I cannot read this receipt.");
 
     const response = await POST(createRequest(createImageFile()));
     const body = await readJson(response);
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(502);
+    expect(body.code).toBe("INVALID_AI_RESPONSE");
     expect(body.error).toContain("JSON object");
   });
 });

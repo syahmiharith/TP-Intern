@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { extractionToFormValues, receiptExtractionSchema, validateReceiptForm } from "@/lib/receipt";
+import {
+  createSavedReceiptSubmission,
+  extractionToFormValues,
+  receiptExtractionSchema,
+  validateReceiptForm
+} from "@/lib/receipt";
+import { normalizeReceiptExtraction } from "@/lib/receipt-normalizer";
 
 describe("receiptExtractionSchema", () => {
   it("accepts a complete valid extraction", () => {
@@ -9,7 +15,7 @@ describe("receiptExtractionSchema", () => {
       totalAmount: 12000,
       currency: "KRW",
       confidence: "high",
-      notes: []
+      warnings: []
     });
 
     expect(result).toEqual({
@@ -18,11 +24,11 @@ describe("receiptExtractionSchema", () => {
       totalAmount: 12000,
       currency: "KRW",
       confidence: "high",
-      notes: []
+      warnings: []
     });
   });
 
-  it("applies safe defaults for optional confidence and notes", () => {
+  it("applies safe defaults for optional confidence and warnings", () => {
     const result = receiptExtractionSchema.parse({
       merchantName: null,
       date: null,
@@ -31,7 +37,47 @@ describe("receiptExtractionSchema", () => {
     });
 
     expect(result.confidence).toBe("low");
-    expect(result.notes).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+});
+
+describe("normalizeReceiptExtraction", () => {
+  it("normalizes amount, currency, merchant, date, and legacy notes", () => {
+    const result = normalizeReceiptExtraction({
+      merchantName: "  Tealive  ",
+      date: "11/05/2026",
+      totalAmount: "MYR 8.90",
+      currency: "rm",
+      confidence: "medium",
+      notes: ["Currency inferred from receipt symbol."]
+    });
+
+    expect(result).toEqual({
+      merchantName: "Tealive",
+      date: "2026-05-11",
+      totalAmount: 8.9,
+      currency: "MYR",
+      confidence: "medium",
+      warnings: ["Currency inferred from receipt symbol."]
+    });
+  });
+
+  it("keeps partial extraction as success with warnings", () => {
+    const result = normalizeReceiptExtraction({
+      merchantName: "Starbucks",
+      date: null,
+      totalAmount: null,
+      currency: "MYR",
+      confidence: "low",
+      warnings: ["Receipt is blurry."]
+    });
+
+    expect(result.merchantName).toBe("Starbucks");
+    expect(result.date).toBeNull();
+    expect(result.totalAmount).toBeNull();
+    expect(result.warnings).toContain("Receipt is blurry.");
+    expect(result.warnings).toContain("Date could not be confidently extracted. Please enter it manually.");
+    expect(result.warnings).toContain("Total amount could not be confidently extracted. Please enter it manually.");
   });
 });
 
@@ -43,7 +89,7 @@ describe("extractionToFormValues", () => {
       totalAmount: 25.9,
       currency: "MYR",
       confidence: "medium",
-      notes: ["Tax line was ignored.", "Currency inferred from symbol."]
+      warnings: ["Tax line was ignored.", "Currency inferred from symbol."]
     });
 
     expect(formValues).toEqual({
@@ -62,7 +108,7 @@ describe("extractionToFormValues", () => {
       totalAmount: null,
       currency: null,
       confidence: "low",
-      notes: []
+      warnings: []
     });
 
     expect(formValues).toEqual({
@@ -71,6 +117,36 @@ describe("extractionToFormValues", () => {
       totalAmount: "",
       currency: "",
       notes: ""
+    });
+  });
+});
+
+describe("createSavedReceiptSubmission", () => {
+  it("stores reviewed values in a structured local submission envelope", () => {
+    const submission = createSavedReceiptSubmission({
+      id: "receipt-1",
+      createdAt: "2026-05-13T00:00:00.000Z",
+      sourceFileName: "receipt.png",
+      values: {
+        merchantName: " Manual Cafe ",
+        date: "2026-05-11",
+        totalAmount: "15.50",
+        currency: "myr",
+        notes: " Corrected manually. "
+      }
+    });
+
+    expect(submission).toEqual({
+      id: "receipt-1",
+      createdAt: "2026-05-13T00:00:00.000Z",
+      sourceFileName: "receipt.png",
+      data: {
+        merchantName: "Manual Cafe",
+        date: "2026-05-11",
+        totalAmount: "15.50",
+        currency: "MYR",
+        notes: "Corrected manually."
+      }
     });
   });
 });

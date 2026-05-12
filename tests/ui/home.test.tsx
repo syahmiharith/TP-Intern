@@ -63,7 +63,7 @@ describe("Home page", () => {
             totalAmount: 12000,
             currency: "KRW",
             confidence: "high",
-            notes: ["Clear receipt image."]
+            warnings: ["Clear receipt image."]
           }
         })
       }))
@@ -128,12 +128,17 @@ describe("Home page", () => {
     expect(screen.getAllByText(/Manual Cafe/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/MYR/).length).toBeGreaterThan(0);
 
-    expect(JSON.parse(window.localStorage.getItem("latestReceiptSubmission") ?? "{}")).toEqual({
-      merchantName: "Manual Cafe",
-      date: "2026-05-11",
-      totalAmount: "15.50",
-      currency: "MYR",
-      notes: "Corrected manually."
+    expect(JSON.parse(window.localStorage.getItem("latestReceiptSubmission") ?? "{}")).toMatchObject({
+      id: expect.any(String),
+      createdAt: expect.any(String),
+      sourceFileName: "manual-entry",
+      data: {
+        merchantName: "Manual Cafe",
+        date: "2026-05-11",
+        totalAmount: "15.50",
+        currency: "MYR",
+        notes: "Corrected manually."
+      }
     });
   });
 });

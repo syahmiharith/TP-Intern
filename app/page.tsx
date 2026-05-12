@@ -16,6 +16,8 @@ import clsx from "clsx";
 import {
   ReceiptExtraction,
   ReceiptFormValues,
+  SavedReceiptSubmission,
+  createSavedReceiptSubmission,
   emptyReceiptForm,
   extractionToFormValues,
   validateReceiptForm
@@ -26,6 +28,7 @@ type FlowState = "idle" | "file-selected" | "extracting" | "extracted" | "extrac
 
 type ExtractApiResponse = {
   data?: ReceiptExtraction;
+  code?: string;
   error?: string;
 };
 
@@ -408,12 +411,12 @@ function ReviewForm({
         <ConfidenceBadge confidence={extraction?.confidence} />
       </div>
 
-      {extraction?.notes?.length ? (
+      {extraction?.warnings.length ? (
         <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <p className="mb-2 text-sm font-bold text-amber-900">AI notes</p>
+          <p className="mb-2 text-sm font-bold text-amber-900">AI warnings</p>
           <ul className="list-disc space-y-1 pl-5 text-sm text-amber-800">
-            {extraction.notes.map((note, index) => (
-              <li key={`${note}-${index}`}>{note}</li>
+            {extraction.warnings.map((warning, index) => (
+              <li key={`${warning}-${index}`}>{warning}</li>
             ))}
           </ul>
         </div>
@@ -495,7 +498,9 @@ function ReviewForm({
   );
 }
 
-function SubmissionSummary({ data, onScanAnother }: { data: ReceiptFormValues; onScanAnother: () => void }) {
+function SubmissionSummary({ submission, onScanAnother }: { submission: SavedReceiptSubmission; onScanAnother: () => void }) {
+  const { data } = submission;
+
   return (
     <section className="mt-6 animate-[fadeSlideUp_300ms_ease-out] rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5 shadow-soft">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -503,7 +508,9 @@ function SubmissionSummary({ data, onScanAnother }: { data: ReceiptFormValues; o
           <CheckCircle2 className="mt-0.5 h-5 w-5 flex-none" aria-hidden="true" />
           <div>
             <h2 className="text-lg font-bold">Receipt data submitted successfully</h2>
-            <p className="mt-1 text-sm text-emerald-700">The reviewed receipt data was saved locally for this demo.</p>
+            <p className="mt-1 text-sm text-emerald-700">
+              The reviewed receipt data was saved locally for this demo from {submission.sourceFileName}.
+            </p>
           </div>
         </div>
         <button
@@ -532,7 +539,7 @@ function SubmissionSummary({ data, onScanAnother }: { data: ReceiptFormValues; o
       <details className="mt-4 rounded-2xl border border-emerald-200 bg-white/80 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emerald-800">View submitted JSON</summary>
         <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100">
-          {JSON.stringify(data, null, 2)}
+          {JSON.stringify(submission, null, 2)}
         </pre>
       </details>
     </section>
@@ -544,7 +551,7 @@ export default function Home() {
   const [formValues, setFormValues] = useState<ReceiptFormValues>(emptyReceiptForm);
   const [extraction, setExtraction] = useState<ReceiptExtraction | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [submittedData, setSubmittedData] = useState<ReceiptFormValues | null>(null);
+  const [submittedData, setSubmittedData] = useState<SavedReceiptSubmission | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -661,13 +668,10 @@ export default function Home() {
       return;
     }
 
-    const normalizedSubmission: ReceiptFormValues = {
-      merchantName: formValues.merchantName.trim(),
-      date: formValues.date.trim(),
-      totalAmount: formValues.totalAmount.trim(),
-      currency: formValues.currency.trim().toUpperCase(),
-      notes: formValues.notes.trim()
-    };
+    const normalizedSubmission = createSavedReceiptSubmission({
+      sourceFileName: selectedFile?.name ?? "manual-entry",
+      values: formValues
+    });
 
     window.localStorage.setItem("latestReceiptSubmission", JSON.stringify(normalizedSubmission, null, 2));
     setSubmittedData(normalizedSubmission);
@@ -730,7 +734,7 @@ export default function Home() {
           />
         </div>
 
-        {submittedData ? <SubmissionSummary data={submittedData} onScanAnother={clearReceipt} /> : null}
+        {submittedData ? <SubmissionSummary submission={submittedData} onScanAnother={clearReceipt} /> : null}
       </section>
     </main>
   );

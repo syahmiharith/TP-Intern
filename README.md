@@ -11,7 +11,7 @@ Gemini-powered receipt extraction app built for the TP Malaysia AI Intern assess
 1. Open the live demo.
 2. Upload a clear JPG, PNG, or WEBP receipt.
 3. Run AI extraction.
-4. Review the extracted merchant, date, total amount, currency, confidence, and notes.
+4. Review the extracted merchant, date, total amount, currency, confidence, and warnings.
 5. Edit one field to confirm the AI output is reviewable.
 6. Submit and inspect the saved JSON output.
 
@@ -32,10 +32,10 @@ I built this as an end-to-end AI-assisted workflow, not just a Gemini API call. 
 - Receipt upload for `.jpg`, `.jpeg`, `.png`, and `.webp`
 - 5MB client and API upload limit
 - Gemini Vision extraction for merchant name, date, total amount, and currency
-- Editable review form with confidence and AI notes
+- Editable review form with confidence and AI warnings
 - Required-field and format validation before submit
 - Currency normalization to uppercase on submit
-- `localStorage.latestReceiptSubmission` persistence
+- Structured `localStorage.latestReceiptSubmission` persistence with `id`, `createdAt`, `sourceFileName`, and reviewed data
 - Reset flow that clears upload, preview, errors, extracted data, and submission output
 - Mocked Playwright E2E suite and opt-in live Gemini E2E smoke test
 - GitHub Actions CI, Dependabot, Vercel Analytics, and Speed Insights
@@ -52,6 +52,7 @@ The important part is the control system around the AI: input checks, strict JSO
 | --- | --- |
 | Server-side Gemini route | Protects `GEMINI_API_KEY` and centralizes validation. |
 | Zod validation for model output | Prevents malformed Gemini responses from silently filling the form. |
+| Deterministic normalizer | Keeps AI output predictable before it reaches the editable form. |
 | Human review before submit | Keeps AI assistance useful without removing user control. |
 | Mocked default E2E tests | Keeps CI deterministic, fast, and free from API quota issues. |
 | Separate live Gemini smoke test | Verifies real integration only when explicitly requested. |
@@ -61,13 +62,116 @@ The important part is the control system around the AI: input checks, strict JSO
 ## Reliability & Security
 
 - `GEMINI_API_KEY` is read only inside `POST /api/extract-receipt`.
-- Uploads are restricted to image types and capped at 5MB.
+- Uploads are restricted to JPG, PNG, and WEBP on both client and server, and capped at 5MB.
 - Gemini is instructed to return strict JSON only.
 - API responses are parsed and validated before reaching the form.
+- API failures return machine-readable error codes with safe public messages.
+- Gemini requests use a timeout so the API does not wait indefinitely.
 - Missing, malformed, low-confidence, and failed extraction paths are covered by tests.
 - Repeated extraction requests from the same client IP are rate limited.
+- The API logs lifecycle events and error categories without logging API keys or image contents.
+- Basic security headers are configured: `nosniff`, `DENY` framing, and strict-origin referrer policy.
 - `npm audit --audit-level=moderate` currently reports zero vulnerabilities after dependency fixes.
 - `.env` and local environment files are ignored by Git.
+
+## Architecture
+
+```text
+User
+ ↓
+Next.js Frontend
+ - upload receipt
+ - preview image
+ - review/edit extracted fields
+ - submit reviewed result
+ ↓
+POST /api/extract-receipt
+ - server-side file validation
+ - per-IP rate limit
+ - AI extraction service call
+ - JSON parsing and normalization
+ - Zod validation
+ ↓
+Gemini Vision
+ ↓
+Validated extraction result with warnings
+ ↓
+Editable review form
+ ↓
+localStorage.latestReceiptSubmission
+```
+
+The AI performs the uncertain extraction step. Deterministic application code owns validation, normalization, user review, fallback, and final structured output.
+
+## API Contract
+
+### `POST /api/extract-receipt`
+
+Request:
+
+- `multipart/form-data`
+- field: `receipt`
+- accepted types: `image/jpeg`, `image/png`, `image/webp`
+- max size: `5MB`
+
+Success:
+
+```json
+{
+  "data": {
+    "merchantName": "FamilyMart",
+    "date": "2026-05-11",
+    "totalAmount": 12000,
+    "currency": "KRW",
+    "confidence": "high",
+    "warnings": []
+  }
+}
+```
+
+Partial extraction still returns `200` with empty fields as `null` and warnings for manual review.
+
+Error:
+
+```json
+{
+  "code": "FILE_TOO_LARGE",
+  "error": "Receipt image must be 5MB or smaller."
+}
+```
+
+Current error codes:
+
+```text
+NO_RECEIPT_UPLOADED
+INVALID_FILE_TYPE
+FILE_TOO_LARGE
+RATE_LIMITED
+AI_PROVIDER_ERROR
+INVALID_AI_RESPONSE
+UNKNOWN_ERROR
+```
+
+## Accessibility, Observability, And Performance
+
+- Upload, form inputs, and actions are keyboard accessible.
+- Inputs use visible labels; invalid fields use `aria-invalid` and field-level error text.
+- Error and success states are rendered as readable page content rather than browser alerts.
+- API logs request lifecycle and failure categories, but never logs API keys, image contents, or base64 payloads.
+- Vercel function logs are the intended debugging surface for production extraction failures.
+- File size is capped at 5MB and previews are rendered client-side to keep the app lightweight.
+
+## Demo Preview
+
+Add final screenshots or a GIF before submission if available:
+
+```text
+docs/screenshots/upload.png
+docs/screenshots/extracted-form.png
+docs/screenshots/submit-summary.png
+```
+
+Demo video: add the final recording link here before sending the assessment.
 
 ## Validation Evidence
 
@@ -181,10 +285,10 @@ npx playwright install
 3. The API route validates the file and checks the rate limit.
 4. The API route encodes the image and calls Gemini.
 5. Gemini returns strict JSON for the required fields.
-6. The API route extracts JSON, validates it with Zod, and returns structured data.
+6. The AI service extracts JSON, normalizes it, validates it with Zod, and returns structured data.
 7. The UI auto-fills an editable form.
 8. The user reviews, corrects, and submits.
-9. The normalized submission is saved to browser localStorage and displayed as JSON.
+9. The reviewed submission is saved to browser localStorage with metadata and displayed as JSON.
 
 ## Deployment
 

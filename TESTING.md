@@ -9,11 +9,12 @@ This project uses layered tests so the assessment can be reviewed with confidenc
 | Lint | `npm run lint` | Catch formatting, React, and Next.js rule issues. |
 | Typecheck | `npm run typecheck` | Catch TypeScript errors before build/deploy. |
 | Production build | `npm run build` | Verify the app compiles for Vercel. |
-| Unit tests | `npm run test:unit` | Test receipt schema, conversion, and form validation logic. |
+| Unit tests | `npm run test:unit` | Test receipt schema, normalization, conversion, and form validation logic. |
 | API tests | `npm run test:api` | Test `/api/extract-receipt` with mocked Gemini responses. |
 | UI tests | `npm run test:ui` | Test upload, extraction states, editable form, validation, and localStorage. |
 | Mocked E2E tests | `npm run test:e2e` | Test full browser flows with deterministic mocked extraction responses. |
 | Live Gemini E2E smoke | `npm run test:e2e:live` | Optional real Gemini smoke using local env files. |
+| Production audit | `npm run audit:prod` | Check runtime dependency vulnerabilities. |
 | Full local gate | `npm run test:all` | Run lint, typecheck, build, Vitest, and mocked E2E tests. |
 
 ## Recommended Pre-Submission Commands
@@ -57,7 +58,10 @@ tests/unit/receipt.test.ts
 Covers:
 
 - Valid receipt extraction schema
-- Safe defaults for missing confidence and notes
+- Safe defaults for missing confidence and warnings
+- Deterministic extraction normalization
+- Partial extraction warnings for manual review
+- Structured localStorage submission envelopes
 - Conversion from AI extraction result to editable form values
 - Required merchant name validation
 - Required date validation
@@ -77,11 +81,17 @@ Covers:
 - Missing `GEMINI_API_KEY`
 - Missing uploaded file
 - Non-image upload rejection
+- Strict MIME allowlist rejection for SVG and GIF
+- Accepted JPG, PNG, and WEBP uploads
 - File size limit rejection
 - Successful Gemini JSON extraction
 - Gemini JSON wrapped in markdown fences
+- Partial Gemini responses normalized with warnings
 - Gemini API failure handling
+- Gemini timeout/abort handling
 - Per-IP extraction rate limiting
+- Machine-readable API error codes
+- Safe public message for unexpected failures
 - Invalid Gemini text response handling
 
 The API tests mock `fetch`, so they do not spend API credits or depend on Gemini uptime.
@@ -142,7 +152,7 @@ The default E2E suite mocks `/api/extract-receipt` and covers:
 - Clearing validation errors after edits
 - Currency uppercasing on submit
 - Invalid amount, currency, date, and required field handling
-- Submitted JSON content
+- Submitted JSON content and metadata envelope
 - `localStorage.latestReceiptSubmission`
 - Reset clearing file preview, form, errors, and submission
 - Core happy path on desktop Chromium and mobile Safari project

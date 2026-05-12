@@ -60,7 +60,7 @@ const extractionCases: Array<{
 
 test.describe("receipt extraction behavior", () => {
   test("posts multipart form data once and shows a loading state", async ({ page }) => {
-    const calls = await mockExtractionResponse(page, highConfidenceExtraction, { delayMs: 250 });
+    const calls = await mockExtractionResponse(page, highConfidenceExtraction, { delayMs: 1000 });
 
     await gotoHome(page);
     await uploadReceipt(page);

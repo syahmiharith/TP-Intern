@@ -47,7 +47,7 @@ describe("Home page", () => {
     uploadFile(createImageFile("sample-receipt.png"));
 
     expect(screen.getByText(/sample-receipt\.png/)).toBeInTheDocument();
-    expect(screen.getByAltText("Receipt preview")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Receipt preview" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /extract data with ai/i })).toBeEnabled();
   });
 

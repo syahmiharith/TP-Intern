@@ -39,7 +39,7 @@ test.describe("receipt upload boundaries", () => {
 
     await expect(page.getByText(/unsupported file type/i)).toBeVisible();
     await expect(page.getByText("notes.txt")).toBeHidden();
-    await expect(page.getByAltText("Receipt preview")).toBeHidden();
+    await expect(page.getByRole("img", { name: "Receipt preview" })).toBeHidden();
     await expect(extractButton(page)).toBeDisabled();
   });
 
@@ -54,7 +54,7 @@ test.describe("receipt upload boundaries", () => {
 
     await expect(page.getByText(/file is too large/i)).toBeVisible();
     await expect(page.getByText("large-receipt.png")).toBeHidden();
-    await expect(page.getByAltText("Receipt preview")).toBeHidden();
+    await expect(page.getByRole("img", { name: "Receipt preview" })).toBeHidden();
     await expect(extractButton(page)).toBeDisabled();
   });
 

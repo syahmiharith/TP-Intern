@@ -120,11 +120,15 @@ export async function gotoHome(page: Page) {
 
 export async function uploadReceipt(page: Page, file = defaultReceiptFile) {
   await page.locator('input[type="file"]').setInputFiles(file);
+
+  if (["image/jpeg", "image/png", "image/webp"].includes(file.mimeType) && file.buffer.length <= 5 * 1024 * 1024) {
+    await expect(extractButton(page)).toBeEnabled();
+  }
 }
 
 export async function expectReceiptPreview(page: Page, fileName: string) {
   await expect(page.getByText(fileName)).toBeVisible();
-  await expect(page.getByAltText("Receipt preview")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Receipt preview" })).toBeVisible();
   await expect(extractButton(page)).toBeEnabled();
 }
 

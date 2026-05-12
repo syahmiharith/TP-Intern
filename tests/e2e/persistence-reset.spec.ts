@@ -34,7 +34,7 @@ test.describe("receipt persistence and reset", () => {
     await page.getByRole("button", { name: /reset/i }).click();
 
     await expect(page.getByText("sample-receipt.png")).toBeHidden();
-    await expect(page.getByAltText("Receipt preview")).toBeHidden();
+    await expect(page.getByRole("img", { name: "Receipt preview" })).toBeHidden();
     await expect(page.getByText(/high confidence/i)).toBeHidden();
     await expect(page.getByText(/clear receipt image/i)).toBeHidden();
     await expect(page.getByText(/receipt data submitted successfully/i)).toBeHidden();

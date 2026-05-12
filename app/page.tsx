@@ -1,10 +1,9 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  ExternalLink,
   FileImage,
   Loader2,
   ReceiptText,
@@ -180,46 +179,29 @@ function ReceiptUploader({
 }
 
 function ReceiptPreview({
-  previewUrl,
   selectedFile,
   isExtracting,
   onExtract
 }: {
-  previewUrl: string | null;
   selectedFile: File | null;
   isExtracting: boolean;
   onExtract: () => void;
 }) {
   return (
     <section className="rounded-[1.75rem] border border-white/70 bg-white/95 p-5 shadow-soft">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950">
             <ReceiptText className="h-5 w-5 text-blue-600" aria-hidden="true" /> Receipt Preview
           </h2>
           <p className="mt-1 text-sm text-slate-500">Verify the image before running extraction.</p>
         </div>
-        {previewUrl ? (
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-blue-200 hover:text-blue-700"
-          >
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Open preview
-          </a>
-        ) : null}
       </div>
 
       <div className="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50">
-        {previewUrl ? (
+        {selectedFile ? (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewUrl}
-              alt="Receipt preview"
-              className="max-h-[520px] min-h-64 w-full animate-[fadeScaleIn_300ms_ease-out] object-contain"
-            />
+            <ReceiptPreviewCanvas file={selectedFile} />
             {isExtracting ? (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950/45 p-6 text-center text-white backdrop-blur-[2px]">
                 <div>
@@ -249,6 +231,73 @@ function ReceiptPreview({
         {isExtracting ? "Extracting receipt data..." : "Extract Data with AI"}
       </button>
     </section>
+  );
+}
+
+function ReceiptPreviewCanvas({ file }: { file: File }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const canvas = canvasRef.current;
+    let context: CanvasRenderingContext2D | null = null;
+
+    if (typeof createImageBitmap !== "function") return;
+
+    try {
+      context = canvas?.getContext("2d") ?? null;
+    } catch {
+      context = null;
+    }
+
+    if (!canvas || !context) return;
+    const previewCanvas = canvas;
+    const previewContext = context;
+
+    async function renderPreview() {
+      previewContext.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+      try {
+        const bitmap = await createImageBitmap(file);
+        if (isCancelled) {
+          bitmap.close();
+          return;
+        }
+
+        const maxWidth = 1000;
+        const scale = Math.min(1, maxWidth / bitmap.width);
+        previewCanvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        previewCanvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        previewContext.drawImage(bitmap, 0, 0, previewCanvas.width, previewCanvas.height);
+        bitmap.close();
+      } catch {
+        previewCanvas.width = 900;
+        previewCanvas.height = 540;
+        previewContext.fillStyle = "#f8fafc";
+        previewContext.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+        previewContext.fillStyle = "#475569";
+        previewContext.font = "600 30px Arial, sans-serif";
+        previewContext.textAlign = "center";
+        previewContext.fillText("Receipt preview unavailable", previewCanvas.width / 2, previewCanvas.height / 2 - 12);
+        previewContext.font = "400 22px Arial, sans-serif";
+        previewContext.fillText(file.name, previewCanvas.width / 2, previewCanvas.height / 2 + 28);
+      }
+    }
+
+    void renderPreview();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [file]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      role="img"
+      aria-label="Receipt preview"
+      className="max-h-[520px] min-h-64 w-full animate-[fadeScaleIn_300ms_ease-out] object-contain"
+    />
   );
 }
 
@@ -492,7 +541,6 @@ function SubmissionSummary({ data, onScanAnother }: { data: ReceiptFormValues; o
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ReceiptFormValues>(emptyReceiptForm);
   const [extraction, setExtraction] = useState<ReceiptExtraction | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -522,11 +570,7 @@ export default function Home() {
               : "idle";
 
   function clearReceipt() {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
     setSelectedFile(null);
-    setPreviewUrl(null);
     setFormValues(emptyReceiptForm);
     setExtraction(null);
     setFieldErrors({});
@@ -558,12 +602,7 @@ export default function Home() {
       return;
     }
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
     setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
     setFormValues(emptyReceiptForm);
   }
 
@@ -674,7 +713,6 @@ export default function Home() {
               onRemove={clearReceipt}
             />
             <ReceiptPreview
-              previewUrl={previewUrl}
               selectedFile={selectedFile}
               isExtracting={isExtracting}
               onExtract={extractReceipt}

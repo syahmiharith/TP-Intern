@@ -1,62 +1,87 @@
 # Receipt-to-Form Auto-Fill Web App
 
-AI Intern Assessment submission project. This web app lets a user upload a receipt image, sends it to a generative AI model, extracts the required receipt fields, and auto-fills an editable form for review and submission.
+AI Intern Assessment project for TP Malaysia. The app turns a receipt image into reviewed, structured data: upload a receipt, extract the required fields with Gemini Vision, edit anything uncertain, validate the form, and submit the final JSON locally.
+
+Live demo: <https://tp-intern-malaysia.vercel.app/>
+
+## Why This Project Matters
+
+This project models a common operations workflow: converting messy receipt images into reliable structured fields for downstream processing. It keeps the AI useful but supervised:
+
+- Gemini handles the first-pass extraction.
+- The user reviews and edits before submission.
+- Validation blocks incomplete or malformed data.
+- Automated tests cover normal, failure, malformed, responsive, and live-AI smoke paths.
+
+That combination is relevant to process automation, back-office support, troubleshooting, and documentation work expected in an AI/IT internship.
+
+## Demo Path
+
+Use this flow when showing the project:
+
+1. Upload a clear JPG, PNG, or WEBP receipt.
+2. Click **Extract Data with AI**.
+3. Point out merchant, date, amount, currency, confidence, and AI notes.
+4. Edit one field to show human review.
+5. Submit and show the saved JSON output.
+6. Mention that CI uses mocked Gemini responses while `npm run test:e2e:live` validates the real Gemini integration on demand.
 
 ## Features
 
-- Upload a receipt image (`.jpg`, `.jpeg`, `.png`, `.webp`)
-- Extract required receipt fields using Gemini Vision
-- Auto-fill an editable form with extracted values
-- Validate required fields before submission
-- Submit data to browser localStorage
-- Show final submitted JSON
-- Vercel-ready Next.js project
-- Automated unit, API, UI, E2E, and CI checks
+- Receipt upload for `.jpg`, `.jpeg`, `.png`, and `.webp`
+- 5MB upload limit with client and API validation
+- Server-side Gemini Vision extraction
+- Strict JSON parsing and Zod validation for model output
+- Editable review form for merchant name, date, total amount, currency, and notes
+- Required-field and format validation before submit
+- Currency normalization to uppercase on submit
+- `localStorage.latestReceiptSubmission` persistence
+- Reset flow that clears upload, preview, errors, form data, and submission
+- Mocked Playwright E2E suite plus opt-in live Gemini smoke test
+- GitHub Actions and Vercel-ready project structure
 
-## Required Fields Extracted
+## Tech Stack
+
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- Gemini API through a server-side route
+- Zod
+- Vitest and React Testing Library
+- Playwright
+- GitHub Actions
+
+## Required Receipt Fields
 
 - Merchant name
 - Date
 - Total amount
 - Currency
 
-## Tech Stack
-
-- Next.js
-- TypeScript
-- Tailwind CSS
-- Gemini API via server-side API route
-- Zod for response validation
-- Vitest and React Testing Library for unit/API/UI tests
-- Playwright for E2E tests
-- GitHub Actions for CI
-
 ## Getting Started
 
-### 1. Install dependencies
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment variables
-
-Create a `.env.local` file:
+Create a local env file:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Then add your Gemini API key:
+Add Gemini configuration:
 
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
-`GEMINI_MODEL` is optional. If omitted, the app uses `gemini-2.5-flash`.
+`GEMINI_API_KEY` is required for real extraction. `GEMINI_MODEL` is optional; if it is omitted, the API route uses `gemini-2.5-flash`.
 
-### 3. Run locally
+Run locally:
 
 ```bash
 npm run dev
@@ -70,105 +95,90 @@ http://localhost:3000
 
 ## Testing
 
-Run the fast delivery gate:
+Fast delivery gate:
 
 ```bash
 npm run ci
 ```
 
-Run the full local gate including Playwright E2E:
+Full local gate:
 
 ```bash
 npm run test:all
 ```
 
-Install Playwright browsers before the first E2E run:
+Mocked E2E only:
+
+```bash
+npm run test:e2e
+```
+
+Live Gemini smoke test:
+
+```bash
+npm run test:e2e:live
+```
+
+The default E2E command mocks `/api/extract-receipt`, so it is deterministic and does not spend Gemini quota. The live command loads local env files, uses the real API route, and should be run manually before final submission or demo recording.
+
+Install Playwright browsers once on a new machine:
 
 ```bash
 npx playwright install
 ```
 
-See [`TESTING.md`](./TESTING.md) for the full testing strategy, coverage, manual QA checklist, and deployment checks.
+See [TESTING.md](./TESTING.md) for the full coverage map and manual QA checklist.
 
 ## How It Works
 
 1. The user uploads a receipt image.
-2. The frontend sends the image to `POST /api/extract-receipt`.
-3. The API route converts the file to base64 and sends it to Gemini.
-4. Gemini returns strict JSON containing merchant name, date, total amount, and currency.
-5. The app validates and displays the extracted fields in an editable form.
-6. The user reviews, corrects if needed, and submits the form.
-7. The final submission is saved in browser localStorage and displayed as JSON.
+2. The frontend sends the file to `POST /api/extract-receipt`.
+3. The API route validates the file, encodes it as base64, and calls Gemini.
+4. Gemini is prompted to return strict JSON only.
+5. The API route extracts JSON, validates it with Zod, and returns structured data.
+6. The UI auto-fills an editable form.
+7. The user reviews, corrects, and submits.
+8. The final normalized submission is saved to browser localStorage and displayed as JSON.
 
-## Model Used
+## Prompt Strategy
 
-Default model:
+The extraction prompt asks Gemini to return only:
 
-```text
-gemini-2.5-flash
-```
+- `merchantName`
+- `date`
+- `totalAmount`
+- `currency`
+- `confidence`
+- `notes`
 
-The model can be changed with:
+The prompt also tells the model not to guess unreadable values, to use `null` for missing fields, to format dates as `YYYY-MM-DD` when possible, and to return a 3-letter currency code when possible.
 
-```bash
-GEMINI_MODEL=your_model_name
-```
+## Deployment On Vercel
 
-Gemini 2.5 Flash was selected because it supports image input and text output, which fits receipt image extraction.
-
-## Prompt Used
-
-```text
-You are a careful receipt data extraction assistant.
-
-Extract only these required fields from the receipt image:
-- merchantName
-- date
-- totalAmount
-- currency
-
-Return only valid JSON matching this exact schema:
-{
-  "merchantName": string | null,
-  "date": string | null,
-  "totalAmount": number | null,
-  "currency": string | null,
-  "confidence": "high" | "medium" | "low",
-  "notes": string[]
-}
-
-Rules:
-- Do not include markdown.
-- Do not guess values that are not visible.
-- Use null for unreadable or missing values.
-- Format date as YYYY-MM-DD when possible.
-- totalAmount must be a number only, without currency symbols.
-- currency should be a 3-letter code when possible, such as MYR, USD, KRW, EUR, SGD.
-- Add short notes for uncertainty, unreadable fields, or assumptions.
-```
-
-## Deployment on Vercel
-
-1. Push this repository to GitHub.
-2. Import the repository into Vercel.
+1. Push the repository to GitHub.
+2. Import it into Vercel.
 3. Add environment variables in Vercel Project Settings:
    - `GEMINI_API_KEY`
    - `GEMINI_MODEL` optional
 4. Deploy.
+5. Open the production URL and run one live receipt extraction.
 
-## Demo Video Checklist
+## Assessment Handoff Checklist
 
-Record a 1 to 2 minute video showing:
+Before sending the repository:
 
-1. The app running locally or on Vercel.
-2. Uploading a receipt image.
-3. AI extraction result.
-4. Auto-filled form.
-5. Manual editing of one field.
-6. Form submission and JSON output.
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+- `npm run test:e2e`
+- `npm run test:e2e:live`
+- Confirm `.env` and `.env.local` are not committed.
+- Include a deployed URL or short demo recording.
 
 ## Limitations
 
 - Only image receipts are supported in this MVP.
-- Poor image quality may reduce extraction accuracy.
-- Database persistence is intentionally omitted because local/in-memory storage is acceptable for the assessment.
+- Extraction quality depends on receipt clarity and Gemini availability.
+- The app stores only the latest submission in localStorage because durable database storage is outside the assessment scope.
+- Automated tests reduce regressions but cannot prove every real-world receipt format is handled perfectly.

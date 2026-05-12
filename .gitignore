@@ -5,6 +5,7 @@ out
 .env*.local
 .DS_Store
 npm-debug.log*
+debug.log
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*

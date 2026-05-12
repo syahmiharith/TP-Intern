@@ -4,15 +4,18 @@ import { POST } from "@/app/api/extract-receipt/route";
 const originalEnv = process.env;
 
 function createRequest(file?: File) {
-  const formData = new FormData();
-  if (file) {
-    formData.append("receipt", file);
+  if (file && typeof file.arrayBuffer !== "function") {
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new ArrayBuffer(file.size)
+    });
   }
 
-  return new Request("http://localhost:3000/api/extract-receipt", {
-    method: "POST",
-    body: formData
-  });
+  return {
+    formData: async () =>
+      ({
+        get: (name: string) => (name === "receipt" ? file ?? null : null)
+      }) as FormData
+  } as Request;
 }
 
 function createImageFile(name = "receipt.png", content = "fake image content") {

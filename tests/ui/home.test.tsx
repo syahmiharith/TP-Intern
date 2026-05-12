@@ -81,7 +81,7 @@ describe("Home page", () => {
     expect(screen.getByLabelText(/total amount/i)).toHaveValue(12000);
     expect(screen.getByLabelText(/currency/i)).toHaveValue("KRW");
     expect(screen.getByText(/high confidence/i)).toBeInTheDocument();
-    expect(screen.getByText(/clear receipt image/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/clear receipt image/i).length).toBeGreaterThan(0);
   });
 
   it("shows an error when extraction fails", async () => {

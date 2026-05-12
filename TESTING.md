@@ -1,6 +1,6 @@
 # Testing Guide
 
-This project includes a layered test suite designed to reduce delivery chaos before submitting the AI Intern Assessment.
+This project uses layered tests so the assessment can be reviewed with confidence without depending on Gemini uptime for every run.
 
 ## Test Layers
 
@@ -12,25 +12,25 @@ This project includes a layered test suite designed to reduce delivery chaos bef
 | Unit tests | `npm run test:unit` | Test receipt schema, conversion, and form validation logic. |
 | API tests | `npm run test:api` | Test `/api/extract-receipt` with mocked Gemini responses. |
 | UI tests | `npm run test:ui` | Test upload, extraction states, editable form, validation, and localStorage. |
-| E2E tests | `npm run test:e2e` | Test full browser flows using Playwright. |
-| Live Gemini E2E smoke | `npm run test:e2e:live` | Optional real Gemini smoke that loads local env files and calls Gemini. |
-| Full local gate | `npm run test:all` | Run all quality gates and E2E tests. |
+| Mocked E2E tests | `npm run test:e2e` | Test full browser flows with deterministic mocked extraction responses. |
+| Live Gemini E2E smoke | `npm run test:e2e:live` | Optional real Gemini smoke using local env files. |
+| Full local gate | `npm run test:all` | Run lint, typecheck, build, Vitest, and mocked E2E tests. |
 
-## Recommended Pre-Submission Command
+## Recommended Pre-Submission Commands
 
-Run this before recording the demo video or deploying:
+Run the full deterministic gate:
 
 ```bash
 npm run test:all
 ```
 
-If you want a faster check while developing:
+Run the real Gemini smoke test once before demo recording:
 
 ```bash
-npm run ci
+npm run test:e2e:live
 ```
 
-`npm run ci` runs linting, typechecking, production build, and Vitest tests. It does not run Playwright E2E.
+`npm run test:e2e:live` requires `GEMINI_API_KEY` in a local env file. `GEMINI_MODEL` is optional.
 
 ## First-Time Playwright Setup
 
@@ -40,15 +40,13 @@ Install browsers once:
 npx playwright install
 ```
 
-For Linux CI or a fresh machine:
+For Linux CI or a fresh Linux machine:
 
 ```bash
 npx playwright install --with-deps
 ```
 
-## What Is Covered
-
-### Unit Tests
+## Unit Coverage
 
 File:
 
@@ -59,14 +57,14 @@ tests/unit/receipt.test.ts
 Covers:
 
 - Valid receipt extraction schema
-- Safe defaults for missing confidence/notes
+- Safe defaults for missing confidence and notes
 - Conversion from AI extraction result to editable form values
 - Required merchant name validation
 - Required date validation
 - Total amount validation
 - Currency format validation
 
-### API Tests
+## API Coverage
 
 File:
 
@@ -87,7 +85,7 @@ Covers:
 
 The API tests mock `fetch`, so they do not spend API credits or depend on Gemini uptime.
 
-### UI Tests
+## UI Coverage
 
 File:
 
@@ -107,36 +105,77 @@ Covers:
 - Submit flow
 - localStorage persistence
 
-### E2E Tests
+## E2E Coverage
+
+Shared helpers:
+
+```text
+tests/e2e/support/receipt.ts
+```
+
+Specs:
+
+```text
+tests/e2e/upload-boundaries.spec.ts
+tests/e2e/extraction.spec.ts
+tests/e2e/form-review.spec.ts
+tests/e2e/persistence-reset.spec.ts
+tests/e2e/responsive-smoke.spec.ts
+tests/e2e/live-gemini.spec.ts
+```
+
+The default E2E suite mocks `/api/extract-receipt` and covers:
+
+- Accepted JPG, PNG, and WEBP uploads
+- Rejected non-image uploads
+- Rejected images over 5MB
+- Preview and file metadata rendering
+- Disabled initial extraction state
+- Loading state
+- High, medium, and low confidence extraction responses
+- API 400, 429, and 500 failures
+- Malformed success payloads
+- Empty or missing extraction data
+- Auto-filled form values
+- Editable fields
+- Clearing validation errors after edits
+- Currency uppercasing on submit
+- Invalid amount, currency, date, and required field handling
+- Submitted JSON content
+- `localStorage.latestReceiptSubmission`
+- Reset clearing file preview, form, errors, and submission
+- Core happy path on desktop Chromium and mobile Safari project
+
+## Live Gemini Smoke
 
 File:
 
 ```text
-tests/e2e/receipt-flow.spec.ts
+tests/e2e/live-gemini.spec.ts
 ```
 
-Covers:
-
-- Happy path: upload → extract → edit → submit
-- API failure without crashing
-- Low-confidence extraction corrected manually
-- Required field validation
-
-The E2E tests mock the extraction API. This keeps tests deterministic and avoids failures caused by network/API issues.
-
-The live Gemini smoke test is intentionally separate from the default E2E command. It loads `GEMINI_API_KEY` and `GEMINI_MODEL` from the repo's local env files. Run it only when you want to spend a real Gemini request:
+Run:
 
 ```bash
 npm run test:e2e:live
 ```
 
+This test does not mock `/api/extract-receipt`. It uploads a generated receipt image with clear printed values and asserts:
+
+- The app does not crash.
+- Required fields are populated.
+- Total amount is parseable and positive.
+- Currency is a 3-letter code.
+
+It intentionally avoids exact-value assertions because generative extraction can vary.
+
 ## Manual QA Still Required
 
-Automated tests verify app behavior, but they do not prove real AI extraction quality. Before submission, manually test with at least 3 real receipt images:
+Automated tests verify app behavior, but they do not prove real AI extraction quality across all receipt formats. Before final submission, manually test with at least:
 
 1. A clear Malaysian receipt with MYR.
 2. A clear Korean receipt with KRW.
-3. A blurry or difficult receipt to confirm the app handles uncertainty.
+3. A difficult or blurry receipt to confirm uncertainty and editability.
 
 Manual acceptance checklist:
 
@@ -147,7 +186,7 @@ Manual acceptance checklist:
 - Validation prevents incomplete submission.
 - Submit shows final JSON.
 - No API key appears in the browser console or frontend source.
-- Vercel production URL works after adding environment variables.
+- Production URL works after adding environment variables.
 
 ## Vercel Deployment Check
 
@@ -167,4 +206,4 @@ GEMINI_MODEL=gemini-2.5-flash
 
 ## Known Test Design Decision
 
-The automated tests mock Gemini responses intentionally. Real AI calls are reserved for manual QA because generative outputs can vary and can make CI flaky.
+Gemini is mocked in default automated E2E tests because real AI calls can fail due to quota, model latency, temporary service load, or minor output variance. The live Gemini test is separate so reviewers can validate real integration deliberately without making CI flaky.

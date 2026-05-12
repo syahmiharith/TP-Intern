@@ -42,7 +42,7 @@ test.describe("receipt form review and validation", () => {
     await expect(page.getByText("Date is required.")).toBeVisible();
     await expect(page.getByText("Total amount must be a number greater than 0.")).toBeVisible();
     await expect(page.getByText("Currency is required.")).toBeVisible();
-    await expect(page.getByText(/submission saved locally/i)).toBeHidden();
+    await expect(page.getByText(/receipt data submitted successfully/i)).toBeHidden();
   });
 
   test("clears validation errors as fields are corrected", async ({ page }) => {

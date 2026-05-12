@@ -110,8 +110,9 @@ test.describe("receipt extraction behavior", () => {
       await uploadReceipt(page);
       await extractButton(page).click();
 
+      await expect(page.getByText(/could not extract receipt data/i)).toBeVisible();
       await expect(page.getByText(message)).toBeVisible();
-      await expect(page.getByRole("heading", { name: /review auto-filled form/i })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /review extracted data/i })).toBeVisible();
       await expectFormValues(page, {
         merchantName: "",
         date: "",
@@ -128,6 +129,7 @@ test.describe("receipt extraction behavior", () => {
     await uploadReceipt(page);
     await extractButton(page).click();
 
+    await expect(page.getByText(/could not extract receipt data/i)).toBeVisible();
     await expect(page.getByText("Receipt extraction failed.")).toBeVisible();
     await expect(extractButton(page)).toBeEnabled();
   });
@@ -139,6 +141,7 @@ test.describe("receipt extraction behavior", () => {
     await uploadReceipt(page);
     await extractButton(page).click();
 
+    await expect(page.getByText(/could not extract receipt data/i)).toBeVisible();
     await expect(page.getByText("Receipt extraction failed.")).toBeVisible();
     await expect(extractButton(page)).toBeEnabled();
   });

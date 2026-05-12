@@ -25,10 +25,11 @@ describe("Home page", () => {
   it("renders the assessment flow", () => {
     render(<Home />);
 
-    expect(screen.getByRole("heading", { name: /receipt-to-form auto-fill web app/i })).toBeInTheDocument();
-    expect(screen.getByText(/click to upload receipt/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /ai receipt scanner for instant form auto-fill/i })).toBeInTheDocument();
+    expect(screen.getByText(/tp malaysia ai intern assessment/i)).toBeInTheDocument();
+    expect(screen.getByText(/drop your receipt here or click to upload/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /extract data with ai/i })).toBeDisabled();
-    expect(screen.getByRole("heading", { name: /review auto-filled form/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /review extracted data/i })).toBeInTheDocument();
   });
 
   it("rejects unsupported file types before calling the API", () => {
@@ -36,7 +37,7 @@ describe("Home page", () => {
 
     uploadFile(new File(["hello"], "notes.txt", { type: "text/plain" }));
 
-    expect(screen.getByText(/please upload a jpg, png, or webp receipt image/i)).toBeInTheDocument();
+    expect(screen.getByText(/unsupported file type/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /extract data with ai/i })).toBeDisabled();
   });
 
@@ -45,7 +46,7 @@ describe("Home page", () => {
 
     uploadFile(createImageFile("sample-receipt.png"));
 
-    expect(screen.getByText("sample-receipt.png")).toBeInTheDocument();
+    expect(screen.getByText(/sample-receipt\.png/)).toBeInTheDocument();
     expect(screen.getByAltText("Receipt preview")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /extract data with ai/i })).toBeEnabled();
   });
@@ -105,7 +106,7 @@ describe("Home page", () => {
     render(<Home />);
 
     fireEvent.change(screen.getByLabelText(/merchant name/i), { target: { value: "Only Merchant" } });
-    fireEvent.click(screen.getByRole("button", { name: /submit extracted data/i }));
+    fireEvent.click(screen.getByRole("button", { name: /submit final data/i }));
 
     expect(screen.getByText("Date is required.")).toBeInTheDocument();
     expect(screen.getByText("Total amount must be a number greater than 0.")).toBeInTheDocument();
@@ -121,11 +122,11 @@ describe("Home page", () => {
     fireEvent.change(screen.getByLabelText(/currency/i), { target: { value: "myr" } });
     fireEvent.change(screen.getByLabelText(/notes/i), { target: { value: "Corrected manually." } });
 
-    fireEvent.click(screen.getByRole("button", { name: /submit extracted data/i }));
+    fireEvent.click(screen.getByRole("button", { name: /submit final data/i }));
 
-    expect(screen.getByText(/submission saved locally/i)).toBeInTheDocument();
-    expect(screen.getByText(/Manual Cafe/)).toBeInTheDocument();
-    expect(screen.getByText(/MYR/)).toBeInTheDocument();
+    expect(screen.getByText(/receipt data submitted successfully/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Manual Cafe/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/MYR/).length).toBeGreaterThan(0);
 
     expect(JSON.parse(window.localStorage.getItem("latestReceiptSubmission") ?? "{}")).toEqual({
       merchantName: "Manual Cafe",

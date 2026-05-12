@@ -29,7 +29,7 @@ test.describe("receipt persistence and reset", () => {
   test("reset clears preview, form values, extraction notes, errors, and submitted output", async ({ page }) => {
     await runMockedExtraction(page);
     await submitButton(page).click();
-    await expect(page.getByText(/submission saved locally/i)).toBeVisible();
+    await expect(page.getByText(/receipt data submitted successfully/i)).toBeVisible();
 
     await page.getByRole("button", { name: /reset/i }).click();
 
@@ -37,7 +37,7 @@ test.describe("receipt persistence and reset", () => {
     await expect(page.getByAltText("Receipt preview")).toBeHidden();
     await expect(page.getByText(/high confidence/i)).toBeHidden();
     await expect(page.getByText(/clear receipt image/i)).toBeHidden();
-    await expect(page.getByText(/submission saved locally/i)).toBeHidden();
+    await expect(page.getByText(/receipt data submitted successfully/i)).toBeHidden();
     await expectFormValues(page, {
       merchantName: "",
       date: "",

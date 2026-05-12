@@ -70,7 +70,7 @@ export function extractButton(page: Page) {
 }
 
 export function submitButton(page: Page) {
-  return page.getByRole("button", { name: /submit extracted data/i });
+  return page.getByRole("button", { name: /submit final data/i });
 }
 
 export function merchantNameInput(page: Page) {
@@ -115,7 +115,7 @@ export async function typeTextInput(locator: Locator, value: string) {
 
 export async function gotoHome(page: Page) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /receipt-to-form auto-fill web app/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /ai receipt scanner for instant form auto-fill/i })).toBeVisible();
 }
 
 export async function uploadReceipt(page: Page, file = defaultReceiptFile) {
@@ -220,7 +220,7 @@ export async function expectLatestSubmission(
     notes: string;
   }
 ) {
-  await expect(page.getByText(/submission saved locally/i)).toBeVisible();
+  await expect(page.getByText(/receipt data submitted successfully/i)).toBeVisible();
   await expect(page.locator("pre")).toContainText(expected.merchantName);
   await expect(page.locator("pre")).toContainText(expected.currency);
   await expect(readLatestSubmission(page)).resolves.toEqual(expected);

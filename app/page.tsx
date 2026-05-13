@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   AlertCircle,
   Check,
@@ -291,95 +291,112 @@ function ExpandedReceiptDetails({
         <p className="mt-0.5 text-xs text-slate-600">Some fields could not be extracted confidently. Please check manually.</p>
       ) : null}
 
-      <div className="mt-2 grid gap-2 lg:grid-cols-2">
-        <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange} />
-        <label className="space-y-1">
-          <span className="text-xs font-semibold text-slate-700">Receipt Type</span>
-          <select
-            aria-label="Receipt Type"
-            value={item.formValues.receiptType}
-            onChange={(event) => onFieldChange(item.id, "receiptType", event.target.value)}
-            aria-invalid={Boolean(item.errors.receiptType)}
-            className={clsx(
-              "w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
-              item.errors.receiptType ? "border-rose-300 bg-rose-50" : "border-slate-200"
-            )}
-          >
-            <option value="">Select type</option>
-            {receiptTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-          {item.errors.receiptType ? <p className="text-xs font-medium text-rose-600">{item.errors.receiptType}</p> : null}
-        </label>
-      </div>
+      <div className={clsx("mt-2 grid gap-3", reviewRequired && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
+        <div className={clsx(reviewRequired && "order-2 lg:order-1")}>
+          <div className="grid gap-2 lg:grid-cols-2">
+            <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange} />
+            <label className="space-y-1">
+              <span className="text-xs font-semibold text-slate-700">Receipt Type</span>
+              <select
+                aria-label="Receipt Type"
+                value={item.formValues.receiptType}
+                onChange={(event) => onFieldChange(item.id, "receiptType", event.target.value)}
+                aria-invalid={Boolean(item.errors.receiptType)}
+                className={clsx(
+                  "w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
+                  item.errors.receiptType ? "border-rose-300 bg-rose-50" : "border-slate-200"
+                )}
+              >
+                <option value="">Select type</option>
+                {receiptTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+              {item.errors.receiptType ? <p className="text-xs font-medium text-rose-600">{item.errors.receiptType}</p> : null}
+            </label>
+          </div>
 
-      <div className="mt-2 grid gap-2 lg:grid-cols-3">
-        <EditableField item={item} field="currency" label="Currency" onFieldChange={onFieldChange} />
-        <EditableField item={item} field="totalAmount" label="Total Amount" type="number" onFieldChange={onFieldChange} />
-        <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange} />
-      </div>
+          <div className="mt-2 grid gap-2 lg:grid-cols-3">
+            <EditableField item={item} field="currency" label="Currency" onFieldChange={onFieldChange} />
+            <EditableField item={item} field="totalAmount" label="Total Amount" type="number" onFieldChange={onFieldChange} />
+            <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange} />
+          </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold text-slate-700">AI Confidence</p>
-          <p className="mt-1 text-sm capitalize text-slate-600">{item.extraction?.confidence ?? "Not extracted"} confidence</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-slate-700">AI Notes</p>
-          {item.formValues.notes ? (
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
-              {item.formValues.notes.split("\n").filter(Boolean).map((note, index) => (
-                <li key={`${note}-${index}`}>{note}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-1 text-sm text-slate-500">No major uncertainty detected.</p>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <p className="mb-1.5 text-xs font-semibold text-slate-700">Extracted Items</p>
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-3 py-1.5">Item</th>
-                <th className="w-20 px-3 py-1.5">Qty</th>
-                <th className="w-28 px-3 py-1.5">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {item.extraction?.items.length ? (
-                item.extraction.items.map((lineItem, index) => (
-                  <tr key={`${lineItem.name}-${index}`} className="border-t border-slate-100">
-                    <td className="px-3 py-1.5 text-slate-800">{lineItem.name}</td>
-                    <td className="px-3 py-1.5 text-slate-600">{lineItem.quantity ?? "—"}</td>
-                    <td className="px-3 py-1.5 text-slate-600">{lineItem.value ?? "Needs review"}</td>
-                  </tr>
-                ))
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold text-slate-700">AI Confidence</p>
+              <p className="mt-1 text-sm capitalize text-slate-600">{item.extraction?.confidence ?? "Not extracted"} confidence</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-700">AI Notes</p>
+              {item.formValues.notes ? (
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
+                  {item.formValues.notes.split("\n").filter(Boolean).map((note, index) => (
+                    <li key={`${note}-${index}`}>{note}</li>
+                  ))}
+                </ul>
               ) : (
-                <tr>
-                  <td className="px-3 py-3 text-slate-500" colSpan={3}>
-                    No line items extracted.
-                  </td>
-                </tr>
+                <p className="mt-1 text-sm text-slate-500">No major uncertainty detected.</p>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+          </div>
 
-      <button
-        type="button"
-        onClick={() => onSave(item.id)}
-        className="mt-3 inline-flex items-center justify-center rounded-lg bg-slate-950 px-3 py-1.5 text-sm font-bold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-      >
-        Save changes
-      </button>
+          <div className="mt-3">
+            <p className="mb-1.5 text-xs font-semibold text-slate-700">Extracted Items</p>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-3 py-1.5">Item</th>
+                    <th className="w-20 px-3 py-1.5">Qty</th>
+                    <th className="w-28 px-3 py-1.5">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {item.extraction?.items.length ? (
+                    item.extraction.items.map((lineItem, index) => (
+                      <tr key={`${lineItem.name}-${index}`} className="border-t border-slate-100">
+                        <td className="px-3 py-1.5 text-slate-800">{lineItem.name}</td>
+                        <td className="px-3 py-1.5 text-slate-600">{lineItem.quantity ?? "—"}</td>
+                        <td className="px-3 py-1.5 text-slate-600">{lineItem.value ?? "Needs review"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="px-3 py-3 text-slate-500" colSpan={3}>
+                        No line items extracted.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onSave(item.id)}
+            className="mt-3 inline-flex items-center justify-center rounded-lg bg-slate-950 px-3 py-1.5 text-sm font-bold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Save changes
+          </button>
+        </div>
+
+        {reviewRequired ? (
+          <aside className="order-1 rounded-xl border border-rose-100 bg-white p-2 lg:order-2 lg:sticky lg:top-32 lg:self-start">
+            <p className="mb-2 text-xs font-semibold text-slate-700">Receipt image</p>
+            <div className="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-50">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Blob preview URLs cannot be optimized by next/image. */}
+              <img src={item.previewUrl} alt={`Inline preview of ${item.file.name}`} className="mx-auto max-h-72 w-auto object-contain" />
+            </div>
+            <p className="mt-2 truncate text-xs text-slate-500" title={item.file.name}>
+              {item.file.name}
+            </p>
+          </aside>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -443,6 +460,20 @@ function ReceiptQueueItemRow({
   const complete = isCompleteItem(item);
   const hasLeftEdge = ["extracted", "needs-review", "failed", "edited"].includes(item.status);
   const canShowProcessedActions = !["ready", "extracting"].includes(item.status);
+  const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (!canShowProcessedActions) return;
+
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input, select, textarea, label, a")) return;
+
+    onToggleExpanded(item.id);
+  };
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!canShowProcessedActions || (event.key !== "Enter" && event.key !== " ")) return;
+
+    event.preventDefault();
+    onToggleExpanded(item.id);
+  };
 
   return (
     <article
@@ -467,7 +498,20 @@ function ReceiptQueueItemRow({
         />
       ) : null}
 
-      <div className="relative min-h-[76px] px-3 py-3 pl-14 pr-[7.75rem] sm:pr-[10.5rem]">
+      <div
+        onClick={handleCardClick}
+        onKeyDown={handleCardKeyDown}
+        role={canShowProcessedActions ? "button" : undefined}
+        tabIndex={canShowProcessedActions ? 0 : undefined}
+        aria-expanded={canShowProcessedActions ? item.expanded : undefined}
+        aria-label={canShowProcessedActions ? `${item.expanded ? "Collapse" : "Expand"} details for ${item.file.name}` : undefined}
+        title={canShowProcessedActions ? (item.expanded ? "Collapse receipt details" : "Expand receipt details") : undefined}
+        data-testid={`receipt-row-toggle-${item.file.name}`}
+        className={clsx(
+          "relative min-h-[96px] px-3 py-4 pl-14 pr-[7.75rem] sm:pr-[10.5rem]",
+          canShowProcessedActions && "cursor-pointer hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+        )}
+      >
         <button
           type="button"
           aria-label={item.selected ? `Deselect ${item.file.name}` : `Select ${item.file.name}`}
@@ -497,7 +541,7 @@ function ReceiptQueueItemRow({
           </div>
         </div>
 
-        <div className="absolute right-3 top-3 flex items-center justify-end gap-1">
+        <div className="absolute right-3 top-4 flex items-center justify-end gap-1.5">
           <IconButton label={`Preview ${item.file.name}`} onClick={() => onPreview(item.id)} tone="preview">
             <Eye className="h-4 w-4" aria-hidden="true" />
           </IconButton>
@@ -512,7 +556,7 @@ function ReceiptQueueItemRow({
         </div>
 
         {canShowProcessedActions ? (
-          <div className="absolute bottom-1.5 right-3">
+          <div className="absolute bottom-3 right-3">
             <IconButton
               label={item.expanded ? `Collapse ${item.file.name}` : `Expand ${item.file.name}`}
               onClick={() => onToggleExpanded(item.id)}

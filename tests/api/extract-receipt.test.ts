@@ -320,18 +320,18 @@ describe("POST /api/extract-receipt", () => {
 
     const headers = { "x-forwarded-for": "203.0.113.10" };
 
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 15; index += 1) {
       const response = await POST(createRequest(createImageFile(`receipt-${index}.png`), headers));
       expect(response.status).toBe(200);
     }
 
-    const response = await POST(createRequest(createImageFile("receipt-6.png"), headers));
+    const response = await POST(createRequest(createImageFile("receipt-16.png"), headers));
     const body = await readJson(response);
 
     expect(response.status).toBe(429);
     expect(body.code).toBe("RATE_LIMITED");
-    expect(body.error).toContain("Rate limit exceeded");
-    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(body.error).toContain("15 receipts per minute");
+    expect(fetch).toHaveBeenCalledTimes(15);
   });
 
   it("returns 502 when Gemini returns invalid JSON", async () => {

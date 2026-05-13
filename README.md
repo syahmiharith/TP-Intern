@@ -1,107 +1,90 @@
-# Receipt-to-Form Auto-Fill
+# AI Receipt-to-Form Auto-Fill
 
-Gemini-powered receipt extraction app built for the TP Malaysia AI Intern assessment. It converts a receipt image into structured form data, keeps a human review step before submission, and validates the full flow with deterministic tests plus an opt-in live Gemini smoke test.
+Gemini-powered receipt extraction web app built for the TP Malaysia AI Intern assessment. The app turns receipt images into structured, reviewable data through a CloudConvert-style processing queue: upload receipts, extract selected files, review uncertain fields, and download only complete JSON outputs.
 
-**Live demo:** <https://tp-intern-malaysia.vercel.app/>
+**Open the live assessment app:** <https://tp-intern-malaysia.vercel.app/>
 
-**Reviewer links:** [Testing Guide](./TESTING.md) · [Assessment Handoff](./docs/ASSESSMENT_HANDOFF.md) · [Demo Script](./docs/DEMO_SCRIPT.md)
+**Setup shortcuts:** [Getting Started](#getting-started) · [Deployment](#deployment)
 
-## Reviewer Quick Path
+**Reviewer docs:** [Testing Guide](./TESTING.md) · [Assessment Handoff](./docs/ASSESSMENT_HANDOFF.md) · [Demo Script](./docs/DEMO_SCRIPT.md)
+
+## Quick Path
 
 1. Open the live demo.
-2. Upload a clear JPG, PNG, or WEBP receipt.
-3. Run AI extraction.
-4. Review the extracted merchant, date, total amount, currency, confidence, and warnings.
-5. Edit one field to confirm the AI output is reviewable.
-6. Submit and inspect the saved JSON output.
+2. Upload one to five JPG, PNG, or WEBP receipt images.
+3. Select the files to process and click **Extract**.
+4. Preview receipts, review extracted fields, and fix any `Needs review` result using the inline receipt preview.
+5. Confirm complete rows show a download action.
+6. Download per-receipt JSON or selected complete JSON results.
 
-## Project Ownership
+## Why This Is More Than An API Call
 
-I built this as an end-to-end AI-assisted workflow, not just a Gemini API call. The core ownership decisions were:
+The assessment asks for receipt upload, generative AI extraction, editable review, and structured output. I implemented that as a human-in-the-loop extraction queue rather than a single throwaway form.
 
-- Kept Gemini behind a server-side API route so the API key is never exposed to the browser.
-- Treated AI output as a draft by requiring a user review/edit step before submission.
-- Added validation at the upload, API, model-response, and form-submission boundaries.
-- Added lightweight per-IP rate limiting to reduce Gemini quota abuse.
-- Split tests into deterministic default coverage and a separate live Gemini smoke test.
-- Deployed the app on Vercel and added Vercel Analytics and Speed Insights for production visibility.
-- Kept persistence intentionally scoped to browser localStorage because durable storage was outside the assessment brief.
+Key product decisions:
+
+- AI creates the first draft; the user remains responsible for uncertain or incomplete fields.
+- Batch queue UX supports up to five receipts while keeping extraction sequential to reduce quota risk.
+- Download is available only when the required structured fields are complete.
+- The backend stays small: one secure `POST /api/extract-receipt` route handles validation, rate limiting, and Gemini calls.
 
 ## What I Built
 
-- Receipt upload for `.jpg`, `.jpeg`, `.png`, and `.webp`
-- 5MB client and API upload limit
-- Gemini Vision extraction for merchant name, date, total amount, and currency
-- Editable review form with confidence and AI warnings
-- Required-field and format validation before submit
-- Currency normalization to uppercase on submit
-- Structured `localStorage.latestReceiptSubmission` persistence with `id`, `createdAt`, `sourceFileName`, and reviewed data
-- Reset flow that clears upload, preview, errors, extracted data, and submission output
-- Mocked Playwright E2E suite and opt-in live Gemini E2E smoke test
-- GitHub Actions CI, Dependabot, Vercel Analytics, and Speed Insights
+- Upload queue for up to five receipt images.
+- Supported files: JPG, PNG, WEBP, max 5MB each.
+- Auto-selection for newly uploaded files.
+- Preview modal for every uploaded receipt.
+- Selected-file extraction with sequential API calls.
+- Item-level extracting, extracted, needs-review, failed, and edited states.
+- Bottom-edge progress indicator and left-edge result status indicator.
+- Receipt type classification.
+- Extraction of merchant name, date, total amount, currency, confidence, notes, and line items.
+- Editable details panel for manual correction.
+- Inline receipt preview inside `Needs review` details so users can compare the image while fixing fields.
+- Red validation states for missing required fields.
+- JSON download only for complete results.
+- Batch JSON download that includes only selected complete results.
 
-## Why This Matters For TP Malaysia
+## Engineering Signals
 
-The project models a practical operations automation workflow: turning messy receipt images into reliable structured data while preserving human control. That maps well to support, process improvement, and automation work because it reduces repetitive manual entry without blindly trusting the model.
-
-The important part is the control system around the AI: input checks, strict JSON parsing, validation, rate limiting, failure handling, audit-clean dependencies, and tests that do not depend on Gemini uptime for every CI run.
-
-## Engineering Decisions
-
-| Decision | Reason |
+| Area | Implementation |
 | --- | --- |
-| Server-side Gemini route | Protects `GEMINI_API_KEY` and centralizes validation. |
-| Zod validation for model output | Prevents malformed Gemini responses from silently filling the form. |
-| Deterministic normalizer | Keeps AI output predictable before it reaches the editable form. |
-| Human review before submit | Keeps AI assistance useful without removing user control. |
-| Mocked default E2E tests | Keeps CI deterministic, fast, and free from API quota issues. |
-| Separate live Gemini smoke test | Verifies real integration only when explicitly requested. |
-| In-memory rate limit | Adds assessment-appropriate abuse protection without introducing infrastructure complexity. |
-| localStorage persistence | Matches MVP scope while still showing the final submitted payload. |
+| API key safety | Gemini key is used only in the server-side API route. |
+| Input validation | File type and size are checked before extraction. |
+| Output validation | Gemini output is parsed, normalized, and validated with Zod. |
+| Human review | Low-confidence or incomplete results become `Needs review`. |
+| Abuse protection | In-memory per-IP rate limit allows 15 extractions per minute. |
+| Test strategy | Default tests mock Gemini for deterministic CI. |
+| Real integration | Optional live Gemini Playwright smoke test validates the real API path. |
+| Deployment readiness | Vercel build, analytics, speed insights, and safe error messages are included. |
 
-## Reliability & Security
+## AI Model And Prompt
 
-- `GEMINI_API_KEY` is read only inside `POST /api/extract-receipt`.
-- Uploads are restricted to JPG, PNG, and WEBP on both client and server, and capped at 5MB.
-- Gemini is instructed to return strict JSON only.
-- API responses are parsed and validated before reaching the form.
-- API failures return machine-readable error codes with safe public messages.
-- Gemini requests use a timeout so the API does not wait indefinitely.
-- Missing, malformed, low-confidence, and failed extraction paths are covered by tests.
-- Repeated extraction requests from the same client IP are rate limited.
-- The API logs lifecycle events and error categories without logging API keys or image contents.
-- Basic security headers are configured: `nosniff`, `DENY` framing, and strict-origin referrer policy.
-- `npm audit --audit-level=moderate` currently reports zero vulnerabilities after dependency fixes.
-- `.env` and local environment files are ignored by Git.
+The API uses Gemini through `POST /api/extract-receipt`. By default, the app uses:
 
-## Architecture
-
-```text
-User
- ↓
-Next.js Frontend
- - upload receipt
- - preview image
- - review/edit extracted fields
- - submit reviewed result
- ↓
-POST /api/extract-receipt
- - server-side file validation
- - per-IP rate limit
- - AI extraction service call
- - JSON parsing and normalization
- - Zod validation
- ↓
-Gemini Vision
- ↓
-Validated extraction result with warnings
- ↓
-Editable review form
- ↓
-localStorage.latestReceiptSubmission
+```bash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-The AI performs the uncertain extraction step. Deterministic application code owns validation, normalization, user review, fallback, and final structured output.
+The extraction prompt asks Gemini to return strict JSON only, with these fields:
+
+- `merchantName`
+- `receiptType`
+- `currency`
+- `totalAmount`
+- `date`
+- `confidence`
+- `notes`
+- `items`
+
+Important prompt rules:
+
+- Do not guess unreadable values.
+- Use `null` for missing or unclear fields.
+- Classify receipt type into a fixed category list.
+- Format dates as `YYYY-MM-DD` when possible.
+- Return line items only when visible.
+- Add short uncertainty notes for blurry, hidden, or ambiguous fields.
 
 ## API Contract
 
@@ -111,7 +94,7 @@ Request:
 
 - `multipart/form-data`
 - field: `receipt`
-- accepted types: `image/jpeg`, `image/png`, `image/webp`
+- accepted MIME types: `image/jpeg`, `image/png`, `image/webp`
 - max size: `5MB`
 
 Success:
@@ -119,17 +102,25 @@ Success:
 ```json
 {
   "data": {
-    "merchantName": "FamilyMart",
-    "date": "2026-05-11",
-    "totalAmount": 12000,
-    "currency": "KRW",
+    "merchantName": "AEON Wellness",
+    "receiptType": "Groceries",
+    "currency": "MYR",
+    "totalAmount": 43.8,
+    "date": "2026-05-12",
     "confidence": "high",
-    "warnings": []
+    "notes": [],
+    "items": [
+      {
+        "name": "Gardenia Bread",
+        "quantity": 1,
+        "value": 3.8
+      }
+    ]
   }
 }
 ```
 
-Partial extraction still returns `200` with empty fields as `null` and warnings for manual review.
+Partial extraction still returns `200` with missing values as `null` and `confidence: "low"`. The frontend then marks the row as `Needs review`.
 
 Error:
 
@@ -152,30 +143,65 @@ INVALID_AI_RESPONSE
 UNKNOWN_ERROR
 ```
 
-## Accessibility, Observability, And Performance
-
-- Upload, form inputs, and actions are keyboard accessible.
-- Inputs use visible labels; invalid fields use `aria-invalid` and field-level error text.
-- Error and success states are rendered as readable page content rather than browser alerts.
-- API logs request lifecycle and failure categories, but never logs API keys, image contents, or base64 payloads.
-- Vercel function logs are the intended debugging surface for production extraction failures.
-- File size is capped at 5MB and previews are rendered client-side to keep the app lightweight.
-
-## Demo Preview
-
-Add final screenshots or a GIF before submission if available:
+## Architecture
 
 ```text
-docs/screenshots/upload.png
-docs/screenshots/extracted-form.png
-docs/screenshots/submit-summary.png
+User
+ ↓
+Next.js frontend
+ - upload up to 5 receipts
+ - select files
+ - preview images
+ - review and edit extracted fields
+ - download complete JSON
+ ↓
+POST /api/extract-receipt
+ - server-side file validation
+ - per-IP rate limiting
+ - Gemini request
+ - JSON extraction and normalization
+ - Zod validation
+ ↓
+Gemini Vision
+ ↓
+Validated extraction draft
+ ↓
+Human review queue
+ ↓
+Complete JSON download
 ```
 
-Demo video: add the final recording link here before sending the assessment.
+The AI handles uncertain visual extraction. Deterministic application code owns validation, completeness rules, UI state, downloads, and safe failure handling.
 
-## Validation Evidence
+## Reliability And Security
 
-Main local gates:
+- `GEMINI_API_KEY` is never exposed to the browser.
+- Uploads are restricted to JPG, PNG, and WEBP on both client and server.
+- Files above 5MB are rejected before extraction.
+- Gemini responses are parsed and validated before reaching the UI.
+- Required fields must be valid before a result becomes downloadable.
+- `Needs review` results show red field-level validation and inline receipt preview.
+- API failures return machine-readable error codes with safe public messages.
+- Gemini requests use a timeout so the route does not wait indefinitely.
+- Repeated extraction requests are rate limited per client IP.
+- The app logs lifecycle events without logging API keys or image contents.
+- Basic security headers are configured.
+
+## Testing
+
+Fast CI-style gate:
+
+```bash
+npm run ci
+```
+
+Full deterministic local gate:
+
+```bash
+npm run test:all
+```
+
+Individual checks:
 
 ```bash
 npm run lint
@@ -183,16 +209,16 @@ npm run typecheck
 npm run build
 npm run test
 npm run test:e2e
-npm run audit
+npm run audit:prod
 ```
 
-Coverage highlights:
+Live Gemini smoke test:
 
-- Unit tests for receipt schema conversion and form validation
-- API tests for missing keys, upload boundaries, Gemini failures, malformed responses, and rate limiting
-- UI tests for upload, extraction states, manual edits, validation, submit, and localStorage
-- Playwright E2E for upload boundaries, extraction behavior, form review, persistence/reset, and responsive smoke
-- Optional live Gemini E2E smoke test for real API validation
+```bash
+npm run test:e2e:live
+```
+
+The default E2E suite mocks `/api/extract-receipt`, so it is deterministic and does not spend Gemini quota. The live command uses the real API route and should be run before recording the final demo.
 
 See [TESTING.md](./TESTING.md) for the full coverage map.
 
@@ -230,8 +256,6 @@ GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
-`GEMINI_API_KEY` is required for real extraction. `GEMINI_MODEL` is optional; if it is omitted, the API route uses `gemini-2.5-flash`.
-
 Run locally:
 
 ```bash
@@ -244,66 +268,20 @@ Open:
 http://localhost:3000
 ```
 
-## Testing
-
-Fast delivery gate:
-
-```bash
-npm run ci
-```
-
-Full local gate:
-
-```bash
-npm run test:all
-```
-
-Mocked E2E only:
-
-```bash
-npm run test:e2e
-```
-
-Live Gemini smoke test:
-
-```bash
-npm run test:e2e:live
-```
-
-The default E2E command mocks `/api/extract-receipt`, so it is deterministic and does not spend Gemini quota. The live command loads local env files, uses the real API route, and should be run manually before final submission or demo recording.
-
-Install Playwright browsers once on a new machine:
-
-```bash
-npx playwright install
-```
-
-## How It Works
-
-1. The user uploads a receipt image.
-2. The frontend sends the file to `POST /api/extract-receipt`.
-3. The API route validates the file and checks the rate limit.
-4. The API route encodes the image and calls Gemini.
-5. Gemini returns strict JSON for the required fields.
-6. The AI service extracts JSON, normalizes it, validates it with Zod, and returns structured data.
-7. The UI auto-fills an editable form.
-8. The user reviews, corrects, and submits.
-9. The reviewed submission is saved to browser localStorage with metadata and displayed as JSON.
-
 ## Deployment
 
 1. Push this repository to GitHub.
 2. Import the repository into Vercel.
-3. Add environment variables in Vercel Project Settings:
+3. Add environment variables:
    - `GEMINI_API_KEY`
    - `GEMINI_MODEL` optional
 4. Deploy.
 5. Open the production URL and run one live receipt extraction.
 
-## Limitations & Next Steps
+## Limitations And Next Steps
 
-- Only image receipts are supported in this MVP.
+- Only image receipts are supported; PDF support is intentionally out of scope.
 - Extraction quality depends on receipt clarity and Gemini availability.
-- The app stores only the latest submission in localStorage because durable database storage is outside the assessment scope.
-- The rate limit is in-memory, which is appropriate for the assessment but not a complete distributed control across scaled serverless instances.
-- A production version could add durable persistence, batch uploads, role-based review, and a distributed rate limiter such as Redis or Vercel KV.
+- Queue state is client-side only and resets on refresh.
+- Rate limiting is in-memory, which is suitable for the assessment but not a distributed production limiter.
+- A production version could add durable storage, authentication, OCR fallbacks, audit history, and Redis or Vercel KV rate limiting.

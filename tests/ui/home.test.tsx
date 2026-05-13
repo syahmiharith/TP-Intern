@@ -129,9 +129,14 @@ describe("Home page receipt queue", () => {
     expect(await screen.findByText(/Needs review/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Download result/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Expand blurry-receipt.png/i }));
+    const reviewRow = screen.getByText("blurry-receipt.png").closest("article");
+    expect(reviewRow).not.toBeNull();
+    fireEvent.click(screen.getByTestId("receipt-row-toggle-blurry-receipt.png"));
+    expect(screen.getByAltText(/Inline preview of blurry-receipt.png/i)).toBeInTheDocument();
     expect(screen.getByText("Merchant name is required.")).toBeInTheDocument();
     expect(screen.getByText("Date is required.")).toBeInTheDocument();
+    fireEvent.click(screen.getByAltText(/Inline preview of blurry-receipt.png/i));
+    expect(screen.getByText("Merchant name is required.")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Merchant Name"), { target: { value: "AEON Wellness" } });
     fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-05-12" } });

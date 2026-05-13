@@ -1,5 +1,5 @@
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 5;
+const RATE_LIMIT_MAX_REQUESTS = 15;
 
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -22,7 +22,7 @@ export function checkReceiptExtractionRateLimit(request: Request) {
     return Response.json(
       {
         code: "RATE_LIMITED",
-        error: "Rate limit exceeded. Please wait before extracting another receipt."
+        error: "Rate limit exceeded. You can extract up to 15 receipts per minute. Please wait before trying again."
       },
       { status: 429 }
     );

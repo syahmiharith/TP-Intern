@@ -271,7 +271,38 @@ describe("POST /api/extract-receipt", () => {
 
     expect(response.status).toBe(429);
     expect(body.code).toBe("AI_PROVIDER_ERROR");
-    expect(body.error).toBe("Rate limit exceeded");
+    expect(body.error).toContain("Gemini is rate limiting");
+  });
+
+  it("normalizes common Gemini JSON shape drift instead of failing extraction", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    mockGeminiResponse(
+      JSON.stringify({
+        merchantName: "Mini Market",
+        receiptType: "grocery",
+        date: "13/05/2026",
+        totalAmount: "RM 12.40",
+        currency: "Ringgit Malaysia",
+        confidence: "High",
+        notes: "Total was visible near the bottom.",
+        items: [{ item: "Bread", qty: "1", price: "3.40" }]
+      })
+    );
+
+    const response = await POST(createRequest(createImageFile()));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      merchantName: "Mini Market",
+      receiptType: "Other",
+      date: "2026-05-13",
+      totalAmount: 12.4,
+      currency: "MYR",
+      confidence: "high",
+      notes: ["Total was visible near the bottom."],
+      items: [{ name: "Bread", quantity: 1, value: 3.4 }]
+    });
   });
 
   it("returns a structured timeout error when Gemini aborts", async () => {

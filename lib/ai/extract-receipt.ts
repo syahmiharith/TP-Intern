@@ -92,6 +92,18 @@ function extractJsonText(rawText: string) {
   return withoutFence.slice(firstBrace, lastBrace + 1);
 }
 
+function getGeminiPublicErrorMessage(status: number, providerMessage?: string) {
+  if (status === 429) {
+    return "Gemini is rate limiting extraction requests right now. Please wait a minute, then retry the failed receipt.";
+  }
+
+  if (status === 500 || status === 502 || status === 503 || status === 504) {
+    return "Gemini is temporarily unavailable or overloaded. Please retry the failed receipt in a moment.";
+  }
+
+  return providerMessage || "Gemini extraction request failed.";
+}
+
 export async function extractReceiptFromImage({
   file,
   apiKey,
@@ -154,7 +166,7 @@ export async function extractReceiptFromImage({
   if (!geminiResponse.ok) {
     throw new ReceiptExtractionError(
       "AI_PROVIDER_ERROR",
-      geminiJson.error?.message || "Gemini extraction request failed.",
+      getGeminiPublicErrorMessage(geminiResponse.status, geminiJson.error?.message),
       geminiResponse.status
     );
   }

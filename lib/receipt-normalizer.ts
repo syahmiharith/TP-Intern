@@ -2,31 +2,25 @@ import { z } from "zod";
 import { ReceiptExtraction, receiptExtractionSchema, receiptTypes } from "@/lib/receipt";
 
 const rawReceiptExtractionSchema = z.object({
-  merchantName: z.string().nullable().optional(),
-  receiptType: z.string().nullable().optional(),
-  date: z.string().nullable().optional(),
-  totalAmount: z.union([z.number(), z.string()]).nullable().optional(),
-  currency: z.string().nullable().optional(),
-  confidence: z.enum(["high", "medium", "low"]).default("low"),
-  warnings: z.array(z.string()).optional(),
-  notes: z.array(z.string()).optional(),
-  items: z
-    .array(
-      z.object({
-        name: z.string().optional(),
-        quantity: z.union([z.number(), z.string()]).nullable().optional(),
-        value: z.union([z.number(), z.string()]).nullable().optional()
-      })
-    )
-    .optional()
-});
+  merchantName: z.unknown().optional(),
+  receiptType: z.unknown().optional(),
+  date: z.unknown().optional(),
+  totalAmount: z.unknown().optional(),
+  currency: z.unknown().optional(),
+  confidence: z.unknown().optional(),
+  warnings: z.unknown().optional(),
+  notes: z.unknown().optional(),
+  items: z.unknown().optional()
+}).passthrough();
 
-function cleanString(value: string | null | undefined) {
-  const trimmed = value?.trim();
+function cleanString(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+
+  const trimmed = String(value).trim();
   return trimmed ? trimmed : null;
 }
 
-function normalizeAmount(value: number | string | null | undefined) {
+function normalizeAmount(value: unknown) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
   }
@@ -41,7 +35,7 @@ function normalizeAmount(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizeCurrency(value: string | null | undefined) {
+function normalizeCurrency(value: unknown) {
   const cleaned = cleanString(value);
   if (!cleaned) return null;
 
@@ -54,7 +48,7 @@ function normalizeCurrency(value: string | null | undefined) {
   return code ?? null;
 }
 
-function normalizeDate(value: string | null | undefined) {
+function normalizeDate(value: unknown) {
   const cleaned = cleanString(value);
   if (!cleaned) return null;
 
@@ -69,7 +63,7 @@ function normalizeDate(value: string | null | undefined) {
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
-function normalizeReceiptType(value: string | null | undefined) {
+function normalizeReceiptType(value: unknown) {
   const cleaned = cleanString(value);
   if (!cleaned) return null;
 
@@ -77,7 +71,22 @@ function normalizeReceiptType(value: string | null | undefined) {
   return match ?? "Other";
 }
 
-function normalizeNumberOrNull(value: number | string | null | undefined) {
+function normalizeConfidence(value: unknown) {
+  const cleaned = cleanString(value)?.toLowerCase();
+  if (cleaned === "high" || cleaned === "medium" || cleaned === "low") return cleaned;
+  return "low";
+}
+
+function normalizeNotes(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((note) => cleanString(note)).filter((note): note is string => Boolean(note));
+  }
+
+  const note = cleanString(value);
+  return note ? [note] : [];
+}
+
+function normalizeNumberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
 
@@ -85,12 +94,20 @@ function normalizeNumberOrNull(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizeLineItems(items: z.infer<typeof rawReceiptExtractionSchema>["items"]) {
-  return (items ?? [])
+function readObjectValue(value: unknown, keys: string[]) {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  return keys.map((key) => record[key]).find((candidate) => candidate !== undefined);
+}
+
+function normalizeLineItems(items: unknown) {
+  if (!Array.isArray(items)) return [];
+
+  return items
     .map((item) => ({
-      name: item.name?.trim() ?? "",
-      quantity: normalizeNumberOrNull(item.quantity),
-      value: normalizeNumberOrNull(item.value)
+      name: cleanString(readObjectValue(item, ["name", "item", "description", "label"])) ?? "",
+      quantity: normalizeNumberOrNull(readObjectValue(item, ["quantity", "qty"])),
+      value: normalizeNumberOrNull(readObjectValue(item, ["value", "price", "amount", "total"]))
     }))
     .filter((item) => item.name.length > 0);
 }
@@ -122,8 +139,8 @@ export function normalizeReceiptExtraction(raw: unknown): ReceiptExtraction {
     date: normalizeDate(parsed.date),
     totalAmount: normalizeAmount(parsed.totalAmount),
     currency: normalizeCurrency(parsed.currency),
-    confidence: parsed.confidence,
-    notes: [...(parsed.notes ?? []), ...(parsed.warnings ?? [])],
+    confidence: normalizeConfidence(parsed.confidence),
+    notes: [...normalizeNotes(parsed.notes), ...normalizeNotes(parsed.warnings)],
     items: normalizeLineItems(parsed.items)
   });
 

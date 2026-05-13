@@ -1,22 +1,13 @@
 import { expect, test } from "@playwright/test";
-import {
-  acceptedReceiptFiles,
-  defaultReceiptFile,
-  expectReceiptPreview,
-  extractButton,
-  gotoHome,
-  merchantNameInput,
-  typeTextInput,
-  uploadReceipt
-} from "./support/receipt";
+import { acceptedReceiptFiles, expectReceiptQueued, gotoHome, uploadReceipt, uploadReceipts } from "./support/receipt";
 
 test.describe("receipt upload boundaries", () => {
-  test("starts with extraction disabled until a valid image is uploaded", async ({ page }) => {
+  test("starts with only the upload area", async ({ page }) => {
     await gotoHome(page);
 
-    await expect(page.getByText(/drop your receipt here or click to upload/i)).toBeVisible();
-    await expect(page.getByText(/upload a receipt and run extraction/i)).toBeVisible();
-    await expect(extractButton(page)).toBeDisabled();
+    await expect(page.getByText("Upload receipt files")).toBeVisible();
+    await expect(page.getByText(/5MB per file/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /AI receipt extraction queue/i })).toBeHidden();
   });
 
   for (const file of acceptedReceiptFiles) {
@@ -24,7 +15,8 @@ test.describe("receipt upload boundaries", () => {
       await gotoHome(page);
       await uploadReceipt(page, file);
 
-      await expectReceiptPreview(page, file.name);
+      await expectReceiptQueued(page, file.name);
+      await expect(page.getByRole("button", { name: new RegExp(`Preview ${file.name}`, "i") })).toBeVisible();
     });
   }
 
@@ -38,9 +30,7 @@ test.describe("receipt upload boundaries", () => {
     });
 
     await expect(page.getByText(/unsupported file type/i)).toBeVisible();
-    await expect(page.getByText("notes.txt")).toBeHidden();
-    await expect(page.getByRole("img", { name: "Receipt preview" })).toBeHidden();
-    await expect(extractButton(page)).toBeDisabled();
+    await expect(page.getByRole("heading", { name: /AI receipt extraction queue/i })).toBeHidden();
   });
 
   test("rejects images larger than 5MB before extraction", async ({ page }) => {
@@ -52,24 +42,22 @@ test.describe("receipt upload boundaries", () => {
       buffer: Buffer.alloc(5 * 1024 * 1024 + 1)
     });
 
-    await expect(page.getByText(/file is too large/i)).toBeVisible();
-    await expect(page.getByText("large-receipt.png")).toBeHidden();
-    await expect(page.getByRole("img", { name: "Receipt preview" })).toBeHidden();
-    await expect(extractButton(page)).toBeDisabled();
+    await expect(page.getByText(/larger than 5MB/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /AI receipt extraction queue/i })).toBeHidden();
   });
 
-  test("replacing a receipt clears old extracted form data", async ({ page }) => {
+  test("limits the queue to five files", async ({ page }) => {
     await gotoHome(page);
-    await uploadReceipt(page, defaultReceiptFile);
-    await typeTextInput(merchantNameInput(page), "Old Merchant");
+    await uploadReceipts(
+      page,
+      Array.from({ length: 5 }, (_, index) => ({
+        name: `receipt-${index + 1}.png`,
+        mimeType: "image/png",
+        buffer: Buffer.from(`receipt-${index + 1}`)
+      }))
+    );
 
-    await uploadReceipt(page, {
-      name: "replacement-receipt.png",
-      mimeType: "image/png",
-      buffer: Buffer.from("replacement image content")
-    });
-
-    await expectReceiptPreview(page, "replacement-receipt.png");
-    await expect(merchantNameInput(page)).toHaveValue("");
+    await expect(page.getByText(/5 \/ 5 files/i).first()).toBeVisible();
+    await expect(page.getByLabel("Add files")).toBeDisabled();
   });
 });

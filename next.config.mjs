@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ["http://172.27.16.1:3000"],
+  allowedDevOrigins: ["172.27.16.1"],
   reactStrictMode: true,
   async headers() {
     return [

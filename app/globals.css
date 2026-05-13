@@ -21,6 +21,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -59,5 +60,23 @@ textarea {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes completeFlash {
+  0% {
+    background-color: #ecfdf5;
+  }
+  100% {
+    background-color: #ffffff;
+  }
+}
+
+@keyframes reviewFlash {
+  0% {
+    background-color: #fff1f2;
+  }
+  100% {
+    background-color: #ffffff;
   }
 }

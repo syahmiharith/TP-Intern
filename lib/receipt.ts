@@ -12,19 +12,41 @@ export type ExtractionErrorCode =
   | "INVALID_AI_RESPONSE"
   | "UNKNOWN_ERROR";
 
+export const receiptTypes = [
+  "Food & Beverage",
+  "Groceries",
+  "Retail",
+  "Transport",
+  "Utilities",
+  "Medical",
+  "Accommodation",
+  "Entertainment",
+  "Other"
+] as const;
+
+export const receiptLineItemSchema = z.object({
+  name: z.string().trim(),
+  quantity: z.number().nullable().default(null),
+  value: z.number().nullable()
+});
+
 export const receiptExtractionSchema = z.object({
   merchantName: z.string().nullable(),
+  receiptType: z.enum(receiptTypes).nullable().default(null),
   date: z.string().nullable(),
   totalAmount: z.number().nullable(),
   currency: z.string().nullable(),
   confidence: z.enum(["high", "medium", "low"]).default("low"),
-  warnings: z.array(z.string()).default([])
+  notes: z.array(z.string()).default([]),
+  items: z.array(receiptLineItemSchema).default([])
 });
 
+export type ReceiptLineItem = z.infer<typeof receiptLineItemSchema>;
 export type ReceiptExtraction = z.infer<typeof receiptExtractionSchema>;
 
 export type ReceiptFormValues = {
   merchantName: string;
+  receiptType: (typeof receiptTypes)[number] | "";
   date: string;
   totalAmount: string;
   currency: string;
@@ -40,6 +62,7 @@ export type SavedReceiptSubmission = {
 
 export const emptyReceiptForm: ReceiptFormValues = {
   merchantName: "",
+  receiptType: "",
   date: "",
   totalAmount: "",
   currency: "",
@@ -49,10 +72,11 @@ export const emptyReceiptForm: ReceiptFormValues = {
 export function extractionToFormValues(extraction: ReceiptExtraction): ReceiptFormValues {
   return {
     merchantName: extraction.merchantName ?? "",
+    receiptType: extraction.receiptType ?? "",
     date: extraction.date ?? "",
     totalAmount: extraction.totalAmount === null ? "" : String(extraction.totalAmount),
     currency: extraction.currency ?? "",
-    notes: extraction.warnings.join("\n")
+    notes: extraction.notes.join("\n")
   };
 }
 
@@ -73,6 +97,7 @@ export function createSavedReceiptSubmission({
     sourceFileName,
     data: {
       merchantName: values.merchantName.trim(),
+      receiptType: values.receiptType,
       date: values.date.trim(),
       totalAmount: values.totalAmount.trim(),
       currency: values.currency.trim().toUpperCase(),
@@ -86,6 +111,10 @@ export function validateReceiptForm(values: ReceiptFormValues) {
 
   if (!values.merchantName.trim()) {
     errors.merchantName = "Merchant name is required.";
+  }
+
+  if (!values.receiptType) {
+    errors.receiptType = "Receipt type is required.";
   }
 
   if (!values.date.trim()) {
@@ -104,4 +133,37 @@ export function validateReceiptForm(values: ReceiptFormValues) {
   }
 
   return errors;
+}
+
+export function isExtractionComplete(extraction: ReceiptExtraction | null) {
+  if (!extraction) return false;
+
+  return Boolean(
+    extraction.merchantName?.trim() &&
+      extraction.receiptType &&
+      extraction.currency?.trim() &&
+      extraction.totalAmount !== null &&
+      extraction.totalAmount > 0 &&
+      extraction.date?.trim() &&
+      extraction.confidence !== "low"
+  );
+}
+
+export function formValuesToExtraction(
+  values: ReceiptFormValues,
+  existing: ReceiptExtraction | null
+): ReceiptExtraction {
+  return receiptExtractionSchema.parse({
+    merchantName: values.merchantName.trim() || null,
+    receiptType: values.receiptType || null,
+    date: values.date.trim() || null,
+    totalAmount: values.totalAmount.trim() ? Number(values.totalAmount) : null,
+    currency: values.currency.trim() ? values.currency.trim().toUpperCase() : null,
+    confidence: existing?.confidence === "low" ? "medium" : existing?.confidence ?? "medium",
+    notes: values.notes
+      .split("\n")
+      .map((note) => note.trim())
+      .filter(Boolean),
+    items: existing?.items ?? []
+  });
 }

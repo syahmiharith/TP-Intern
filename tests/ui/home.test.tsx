@@ -6,15 +6,40 @@ function createImageFile(name = "receipt.png") {
   return new File(["fake image content"], name, { type: "image/png" });
 }
 
-function uploadFile(file: File) {
+function uploadFiles(files: File[]) {
   const input = document.querySelector('input[type="file"]') as HTMLInputElement | null;
   if (!input) throw new Error("File input was not found");
-  fireEvent.change(input, { target: { files: [file] } });
+  fireEvent.change(input, { target: { files } });
 }
 
-describe("Home page", () => {
+const completeExtraction = {
+  merchantName: "AEON Wellness",
+  receiptType: "Groceries",
+  date: "2026-05-12",
+  totalAmount: 43.8,
+  currency: "MYR",
+  confidence: "high",
+  notes: ["No major uncertainty detected."],
+  items: [{ name: "Gardenia Bread", quantity: 1, value: 3.8 }]
+};
+
+const partialExtraction = {
+  merchantName: null,
+  receiptType: "Retail",
+  date: null,
+  totalAmount: null,
+  currency: "MYR",
+  confidence: "low",
+  notes: ["Receipt image is blurry."],
+  items: [{ name: "Item text unclear", quantity: null, value: null }]
+};
+
+describe("Home page receipt queue", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:receipt-preview"),
+      revokeObjectURL: vi.fn()
+    });
   });
 
   afterEach(() => {
@@ -22,123 +47,109 @@ describe("Home page", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the assessment flow", () => {
+  it("starts with only the upload area", () => {
     render(<Home />);
 
-    expect(screen.getByRole("heading", { name: /ai receipt scanner for instant form auto-fill/i })).toBeInTheDocument();
-    expect(screen.getByText(/tp malaysia ai intern assessment/i)).toBeInTheDocument();
-    expect(screen.getByText(/drop your receipt here or click to upload/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /extract data with ai/i })).toBeDisabled();
-    expect(screen.getByRole("heading", { name: /review extracted data/i })).toBeInTheDocument();
+    expect(screen.getByText("Upload receipt files")).toBeInTheDocument();
+    expect(screen.getByText(/JPG, PNG, WEBP/i)).toBeInTheDocument();
+    expect(screen.getByText("AI Receipt-to-Form Auto-Fill")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Human-reviewed AI receipt extraction/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Extract/i })).not.toBeInTheDocument();
   });
 
-  it("rejects unsupported file types before calling the API", () => {
+  it("rejects unsupported file types before adding queue items", () => {
     render(<Home />);
 
-    uploadFile(new File(["hello"], "notes.txt", { type: "text/plain" }));
+    uploadFiles([new File(["hello"], "notes.txt", { type: "text/plain" })]);
 
     expect(screen.getByText(/unsupported file type/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /extract data with ai/i })).toBeDisabled();
+    expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
   });
 
-  it("shows the uploaded file and enables extraction for a valid image", () => {
+  it("adds valid uploads as selected queue items with footer extraction", () => {
     render(<Home />);
 
-    uploadFile(createImageFile("sample-receipt.png"));
+    uploadFiles([createImageFile("receipt-1.png"), createImageFile("receipt-2.png")]);
 
-    expect(screen.getByText(/sample-receipt\.png/)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Receipt preview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /extract data with ai/i })).toBeEnabled();
+    expect(screen.getByRole("heading", { name: /Human-reviewed AI receipt extraction/i })).toBeInTheDocument();
+    expect(screen.getByText("receipt-1.png")).toBeInTheDocument();
+    expect(screen.getByText("receipt-2.png")).toBeInTheDocument();
+    expect(screen.getByText(/2 selected/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Extract 2 files" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Extract receipt-1.png/i })).not.toBeInTheDocument();
   });
 
-  it("auto-fills the form after successful AI extraction", async () => {
+  it("deletes an item and frees an upload slot", () => {
+    render(<Home />);
+
+    uploadFiles([createImageFile("receipt-1.png"), createImageFile("receipt-2.png")]);
+    fireEvent.click(screen.getByRole("button", { name: /Delete receipt-1.png/i }));
+
+    expect(screen.queryByText("receipt-1.png")).not.toBeInTheDocument();
+    expect(screen.getByText(/1 selected/i)).toBeInTheDocument();
+    expect(screen.queryByText(/1 \/ 5 files/i)).not.toBeInTheDocument();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:receipt-preview");
+  });
+
+  it("extracts one ready item and shows complete summary plus download", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
         ok: true,
-        json: async () => ({
-          data: {
-            merchantName: "FamilyMart",
-            date: "2026-05-11",
-            totalAmount: 12000,
-            currency: "KRW",
-            confidence: "high",
-            warnings: ["Clear receipt image."]
-          }
-        })
+        json: async () => ({ data: completeExtraction })
       }))
     );
 
     render(<Home />);
-    uploadFile(createImageFile());
+    uploadFiles([createImageFile("aeon-receipt.png")]);
 
-    fireEvent.click(screen.getByRole("button", { name: /extract data with ai/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Extract 1 file/i }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/merchant name/i)).toHaveValue("FamilyMart");
+      expect(screen.getByText(/Extracted · high/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText(/date/i)).toHaveValue("2026-05-11");
-    expect(screen.getByLabelText(/total amount/i)).toHaveValue(12000);
-    expect(screen.getByLabelText(/currency/i)).toHaveValue("KRW");
-    expect(screen.getByText(/high confidence/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/clear receipt image/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/AEON Wellness · MYR 43.80 · 2026-05-12/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Download result for aeon-receipt.png/i })).toBeInTheDocument();
   });
 
-  it("shows an error when extraction fails", async () => {
+  it("marks partial low-confidence extraction as needs review until manually fixed", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
-        ok: false,
-        json: async () => ({ error: "Gemini extraction failed." })
+        ok: true,
+        json: async () => ({ data: partialExtraction })
       }))
     );
 
     render(<Home />);
-    uploadFile(createImageFile());
+    uploadFiles([createImageFile("blurry-receipt.png")]);
 
-    fireEvent.click(screen.getByRole("button", { name: /extract data with ai/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Extract 1 file/i }));
+    expect(await screen.findByText(/Needs review/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Download result/i })).not.toBeInTheDocument();
 
-    expect(await screen.findByText("Gemini extraction failed.")).toBeInTheDocument();
-  });
-
-  it("validates required fields before submission", () => {
-    render(<Home />);
-
-    fireEvent.change(screen.getByLabelText(/merchant name/i), { target: { value: "Only Merchant" } });
-    fireEvent.click(screen.getByRole("button", { name: /submit final data/i }));
-
+    fireEvent.click(screen.getByRole("button", { name: /Expand blurry-receipt.png/i }));
+    expect(screen.getByText("Merchant name is required.")).toBeInTheDocument();
     expect(screen.getByText("Date is required.")).toBeInTheDocument();
-    expect(screen.getByText("Total amount must be a number greater than 0.")).toBeInTheDocument();
-    expect(screen.getByText("Currency is required.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Merchant Name"), { target: { value: "AEON Wellness" } });
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-05-12" } });
+    fireEvent.change(screen.getByLabelText("Total Amount"), { target: { value: "43.80" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    expect(screen.getByText(/Edited/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Download result for blurry-receipt.png/i })).toBeInTheDocument();
   });
 
-  it("allows manual edits and saves submitted JSON locally", () => {
+  it("opens the preview modal from the row icon", () => {
     render(<Home />);
+    uploadFiles([createImageFile("receipt-preview.png")]);
 
-    fireEvent.change(screen.getByLabelText(/merchant name/i), { target: { value: "Manual Cafe" } });
-    fireEvent.change(screen.getByLabelText(/date/i), { target: { value: "2026-05-11" } });
-    fireEvent.change(screen.getByLabelText(/total amount/i), { target: { value: "15.50" } });
-    fireEvent.change(screen.getByLabelText(/currency/i), { target: { value: "myr" } });
-    fireEvent.change(screen.getByLabelText(/notes/i), { target: { value: "Corrected manually." } });
+    fireEvent.click(screen.getByRole("button", { name: /Preview receipt-preview.png/i }));
 
-    fireEvent.click(screen.getByRole("button", { name: /submit final data/i }));
-
-    expect(screen.getByText(/receipt data submitted successfully/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Manual Cafe/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/MYR/).length).toBeGreaterThan(0);
-
-    expect(JSON.parse(window.localStorage.getItem("latestReceiptSubmission") ?? "{}")).toMatchObject({
-      id: expect.any(String),
-      createdAt: expect.any(String),
-      sourceFileName: "manual-entry",
-      data: {
-        merchantName: "Manual Cafe",
-        date: "2026-05-11",
-        totalAmount: "15.50",
-        currency: "MYR",
-        notes: "Corrected manually."
-      }
-    });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Receipt Preview")).toBeInTheDocument();
+    expect(screen.getByAltText(/Preview of receipt-preview.png/i)).toBeInTheDocument();
   });
 });

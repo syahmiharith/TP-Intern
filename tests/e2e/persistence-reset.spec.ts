@@ -1,67 +1,48 @@
 import { expect, test } from "@playwright/test";
-import {
-  expectFormValues,
-  expectLatestSubmission,
-  extractButton,
-  fillValidReceiptForm,
-  gotoHome,
-  mockExtractionResponse,
-  runMockedExtraction,
-  submitButton,
-  uploadReceipt
-} from "./support/receipt";
+import { gotoHome, uploadReceipts } from "./support/receipt";
 
-test.describe("receipt persistence and reset", () => {
-  test("saves the reviewed receipt JSON to localStorage", async ({ page }) => {
+test.describe("receipt queue item controls", () => {
+  test("opens and closes receipt preview modal", async ({ page }) => {
     await gotoHome(page);
-    await fillValidReceiptForm(page);
-    await submitButton(page).click();
+    await uploadReceipts(page, [{ name: "preview-receipt.png", mimeType: "image/png", buffer: Buffer.from("preview") }]);
 
-    await expectLatestSubmission(page, {
-      merchantName: "Manual Cafe",
-      date: "2026-05-11",
-      totalAmount: "15.50",
-      currency: "MYR",
-      notes: "Corrected manually."
-    });
+    await page.getByRole("button", { name: /Preview preview-receipt.png/i }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByText("Receipt Preview")).toBeVisible();
+
+    await page.getByRole("button", { name: /Close preview/i }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  test("reset clears preview, form values, extraction notes, errors, and submitted output", async ({ page }) => {
-    await runMockedExtraction(page);
-    await submitButton(page).click();
-    await expect(page.getByText(/receipt data submitted successfully/i)).toBeVisible();
+  test("delete removes item and updates counts", async ({ page }) => {
+    await gotoHome(page);
+    await uploadReceipts(page, [
+      { name: "first-receipt.png", mimeType: "image/png", buffer: Buffer.from("first") },
+      { name: "second-receipt.png", mimeType: "image/png", buffer: Buffer.from("second") }
+    ]);
 
-    await page.getByRole("button", { name: /reset/i }).click();
+    await page.getByRole("button", { name: /Delete first-receipt.png/i }).click();
 
-    await expect(page.getByText("sample-receipt.png")).toBeHidden();
-    await expect(page.getByRole("img", { name: "Receipt preview" })).toBeHidden();
-    await expect(page.getByText(/high confidence/i)).toBeHidden();
-    await expect(page.getByText(/clear receipt image/i)).toBeHidden();
-    await expect(page.getByText(/receipt data submitted successfully/i)).toBeHidden();
-    await expectFormValues(page, {
-      merchantName: "",
-      date: "",
-      totalAmount: "",
-      currency: "",
-      notes: ""
-    });
-    await expect(extractButton(page)).toBeDisabled();
+    await expect(page.getByText("first-receipt.png")).toBeHidden();
+    await expect(page.getByText("second-receipt.png")).toBeVisible();
+    await expect(page.getByText(/1 selected/i)).toBeVisible();
+    await expect(page.getByText(/1 \/ 5 files/i)).toBeHidden();
+    await expect(page.getByText("Receipt removed.")).toBeVisible();
   });
 
-  test("reset clears extraction errors", async ({ page }) => {
-    await mockExtractionResponse(page, undefined, {
-      status: 500,
-      body: { error: "Missing GEMINI_API_KEY." }
-    });
-
+  test("select all and deselect all update extract availability", async ({ page }) => {
     await gotoHome(page);
-    await uploadReceipt(page);
-    await extractButton(page).click();
-    await expect(page.getByText("Missing GEMINI_API_KEY.")).toBeVisible();
+    await uploadReceipts(page, [
+      { name: "first-receipt.png", mimeType: "image/png", buffer: Buffer.from("first") },
+      { name: "second-receipt.png", mimeType: "image/png", buffer: Buffer.from("second") }
+    ]);
 
-    await page.getByRole("button", { name: /reset/i }).click();
+    await page.getByRole("button", { name: /Deselect all/i }).click();
+    await expect(page.getByText(/0 selected/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Extract$/i })).toBeDisabled();
 
-    await expect(page.getByText("Missing GEMINI_API_KEY.")).toBeHidden();
-    await expect(extractButton(page)).toBeDisabled();
+    await page.getByRole("button", { name: /Select all/i }).click();
+    await expect(page.getByText(/2 selected/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Extract 2 files/i })).toBeEnabled();
   });
 });

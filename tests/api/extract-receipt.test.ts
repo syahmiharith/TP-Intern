@@ -124,11 +124,13 @@ describe("POST /api/extract-receipt", () => {
     mockGeminiResponse(
       JSON.stringify({
         merchantName: "FamilyMart",
+        receiptType: "Groceries",
         date: "2026-05-11",
         totalAmount: 12000,
         currency: "KRW",
         confidence: "high",
-        warnings: []
+        notes: [],
+        items: []
       })
     );
 
@@ -161,11 +163,13 @@ describe("POST /api/extract-receipt", () => {
     mockGeminiResponse(
       JSON.stringify({
         merchantName: "FamilyMart",
+        receiptType: "Groceries",
         date: "2026-05-11",
         totalAmount: 12000,
         currency: "KRW",
         confidence: "high",
-        warnings: []
+        notes: [],
+        items: []
       })
     );
 
@@ -175,11 +179,13 @@ describe("POST /api/extract-receipt", () => {
     expect(response.status).toBe(200);
     expect(body.data).toEqual({
       merchantName: "FamilyMart",
+      receiptType: "Groceries",
       date: "2026-05-11",
       totalAmount: 12000,
       currency: "KRW",
       confidence: "high",
-      warnings: []
+      notes: [],
+      items: []
     });
   });
 
@@ -188,11 +194,13 @@ describe("POST /api/extract-receipt", () => {
     mockGeminiResponse(`\`\`\`json
 {
   "merchantName": "Tealive",
+  "receiptType": "Food & Beverage",
   "date": "2026-05-11",
   "totalAmount": 8.9,
   "currency": "MYR",
   "confidence": "medium",
-  "warnings": ["Currency inferred from receipt symbol."]
+  "notes": ["Currency inferred from receipt symbol."],
+  "items": [{"name": "Milk Tea", "quantity": 1, "value": 8.9}]
 }
 \`\`\``);
 
@@ -202,19 +210,22 @@ describe("POST /api/extract-receipt", () => {
     expect(response.status).toBe(200);
     expect(body.data).toEqual({
       merchantName: "Tealive",
+      receiptType: "Food & Beverage",
       date: "2026-05-11",
       totalAmount: 8.9,
       currency: "MYR",
       confidence: "medium",
-      warnings: ["Currency inferred from receipt symbol."]
+      notes: ["Currency inferred from receipt symbol."],
+      items: [{ name: "Milk Tea", quantity: 1, value: 8.9 }]
     });
   });
 
-  it("normalizes partial Gemini responses and returns warnings", async () => {
+  it("normalizes partial Gemini responses and returns notes", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     mockGeminiResponse(
       JSON.stringify({
         merchantName: "  Starbucks  ",
+        receiptType: "Retail",
         date: null,
         totalAmount: "MYR 18.90",
         currency: "rm",
@@ -229,14 +240,16 @@ describe("POST /api/extract-receipt", () => {
     expect(response.status).toBe(200);
     expect(body.data).toEqual({
       merchantName: "Starbucks",
+      receiptType: "Retail",
       date: null,
       totalAmount: 18.9,
       currency: "MYR",
       confidence: "medium",
-      warnings: [
+      notes: [
         "Date is unreadable.",
         "Date could not be confidently extracted. Please enter it manually."
-      ]
+      ],
+      items: []
     });
   });
 
@@ -295,11 +308,13 @@ describe("POST /api/extract-receipt", () => {
     mockGeminiResponse(
       JSON.stringify({
         merchantName: "FamilyMart",
+        receiptType: "Groceries",
         date: "2026-05-11",
         totalAmount: 12000,
         currency: "KRW",
         confidence: "high",
-        warnings: []
+        notes: [],
+        items: []
       })
     );
 

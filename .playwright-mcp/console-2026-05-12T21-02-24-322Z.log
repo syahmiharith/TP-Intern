@@ -1,0 +1,31 @@
+[    4687ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:3000/:0
+[    5068ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(pages-dir-browser)/./node_modules/react-dom/cjs/react-dom-client.development.js:28004
+[    5172ms] TypeError: __webpack_modules__[moduleId] is not a function
+    at Object.__webpack_require__ [as require] (file://C:\dev\projects\TP-Intern\.next\server\webpack-runtime.js:25:42)
+    at Object.require (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:39:28568)
+    at globalThis.__next_require__ (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:39:29391)
+    at requireModule (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:318257)
+    at initializeModuleChunk (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:347653)
+    at getOutlinedModel (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:357412)
+    at <unknown> (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:365365)
+    at ResponseInstance._fromJSON (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:365456)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:347044)
+    at resolveModelChunk (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:345332)
+    at processFullStringRow (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:384476)
+    at <unknown> (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:386879)
+    at processBinaryChunk (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:386951)
+    at progress (file://C:\dev\projects\TP-Intern\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:2:388479)
+[    5171ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[    5198ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:3000/favicon.ico:0
+[    5222ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:3000/__nextjs_original-stack-frames:0
+[    6183ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[    7193ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[    8203ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[    9211ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   10237ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   15265ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   20291ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   25326ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   30350ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   35385ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88

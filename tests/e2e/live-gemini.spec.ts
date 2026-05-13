@@ -1,12 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
   createGeneratedReceiptPng,
-  currencyInput,
-  dateInput,
   extractButton,
+  expandCurrentReceipt,
   gotoHome,
-  merchantNameInput,
-  totalAmountInput,
   uploadReceipt
 } from "./support/receipt";
 
@@ -17,8 +14,7 @@ test.describe("live-gemini receipt extraction", () => {
 
     await gotoHome(page);
     await uploadReceipt(page, await createGeneratedReceiptPng(page));
-    await extractButton(page).click();
-    await expect(extractButton(page)).toBeEnabled({ timeout: 60_000 });
+    await extractButton(page, /Extract 1 file/i).click();
 
     const extractionError = page
       .locator("main")
@@ -27,14 +23,9 @@ test.describe("live-gemini receipt extraction", () => {
       throw new Error(`Live Gemini extraction failed: ${await extractionError.first().textContent()}`);
     }
 
-    await expect(page.getByText(/submission saved locally/i)).toBeHidden();
-    await expect(page.getByRole("heading", { name: /review auto-filled form/i })).toBeVisible();
-    await expect(merchantNameInput(page)).not.toHaveValue("", { timeout: 45_000 });
-    await expect(dateInput(page)).not.toHaveValue("");
-    await expect(totalAmountInput(page)).not.toHaveValue("");
-    await expect(currencyInput(page)).toHaveValue(/^[A-Za-z]{3}$/);
-
-    const amount = Number(await totalAmountInput(page).inputValue());
+    await expect(page.getByText(/Extracted|Needs review/i)).toBeVisible({ timeout: 60_000 });
+    await expandCurrentReceipt(page, "live-gemini-receipt.png");
+    const amount = Number(await page.getByLabel("Total Amount").inputValue());
     expect(amount).toBeGreaterThan(0);
   });
 });

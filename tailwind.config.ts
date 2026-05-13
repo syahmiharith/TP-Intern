@@ -10,6 +10,10 @@ const config: Config = {
     extend: {
       boxShadow: {
         soft: "0 18px 60px rgba(15, 23, 42, 0.08)"
+      },
+      animation: {
+        completeFlash: "completeFlash 650ms ease-out",
+        reviewFlash: "reviewFlash 650ms ease-out"
       }
     }
   },

@@ -5,30 +5,49 @@ const GEMINI_REQUEST_TIMEOUT_MS = 20_000;
 
 const EXTRACTION_PROMPT = `You are a careful receipt data extraction assistant.
 
-Extract only these required fields from the receipt image:
+Extract only these fields from the receipt image:
 - merchantName
-- date
-- totalAmount
+- receiptType
 - currency
+- totalAmount
+- date
+- confidence
+- notes
+- items
+
+Classify receiptType into exactly one of:
+Food & Beverage, Groceries, Retail, Transport, Utilities, Medical, Accommodation, Entertainment, Other.
 
 Return only valid JSON matching this exact schema:
 {
   "merchantName": string | null,
-  "date": string | null,
-  "totalAmount": number | string | null,
+  "receiptType": "Food & Beverage" | "Groceries" | "Retail" | "Transport" | "Utilities" | "Medical" | "Accommodation" | "Entertainment" | "Other" | null,
   "currency": string | null,
+  "date": string | null,
+  "totalAmount": number | null,
   "confidence": "high" | "medium" | "low",
-  "warnings": string[]
+  "notes": string[],
+  "items": [
+    {
+      "name": string,
+      "quantity": number | null,
+      "value": number | null
+    }
+  ]
 }
 
 Rules:
 - Do not include markdown.
 - Do not guess values that are not visible.
 - Use null for unreadable or missing values.
+- Use Other when receipt type is unclear.
 - Format date as YYYY-MM-DD when possible.
-- totalAmount should be a number without currency symbols when possible.
+- totalAmount must be a number only, without currency symbols.
 - currency should be a 3-letter code when possible, such as MYR, USD, KRW, EUR, SGD.
-- Add short warnings for uncertainty, unreadable fields, or assumptions.`;
+- Do not invent line items.
+- If item quantity is unclear, use null.
+- If item value is unclear, use null.
+- Add short notes for uncertainty, unreadable fields, or assumptions.`;
 
 type GeminiResponse = {
   candidates?: Array<{

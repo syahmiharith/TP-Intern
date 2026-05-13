@@ -1,0 +1,8 @@
+- main [ref=e2]:
+  - generic [ref=e4]:
+    - button "Upload receipt files JPG, PNG, WEBP · Max 5 files 5MB per file" [ref=e5]
+    - generic [ref=e6] [cursor=pointer]:
+      - img [ref=e7]
+      - generic [ref=e12]: Upload receipt files
+      - generic [ref=e13]: JPG, PNG, WEBP · Max 5 files
+      - generic [ref=e14]: 5MB per file

@@ -1,0 +1,1 @@
+[     319ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88

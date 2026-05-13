@@ -1,0 +1,60 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - heading "AI receipt extraction queue" [level=1] [ref=e18]
+        - paragraph [ref=e19]: 1 / 5 files
+      - article [ref=e21]:
+        - generic [ref=e22]:
+          - button "Deselect appIcon.png" [ref=e23] [cursor=pointer]:
+            - img [ref=e24]
+          - generic [ref=e26]:
+            - generic [ref=e27]:
+              - paragraph [ref=e28]: appIcon.png
+              - generic [ref=e29]: Ready
+              - generic [ref=e30]: Receipt type pending
+            - generic [ref=e31]:
+              - paragraph [ref=e32]: Waiting for extraction
+              - button "Expand appIcon.png" [ref=e33] [cursor=pointer]:
+                - img [ref=e34]
+          - generic [ref=e36]:
+            - button "Preview appIcon.png" [active] [ref=e37] [cursor=pointer]:
+              - img [ref=e38]
+            - button "Extract appIcon.png" [ref=e41] [cursor=pointer]:
+              - img [ref=e42]
+            - button "Delete appIcon.png" [ref=e44] [cursor=pointer]:
+              - img [ref=e45]
+    - generic [ref=e49]:
+      - paragraph [ref=e50]:
+        - generic [ref=e51]: 1 / 5 files ·
+        - text: 1 selected
+      - generic [ref=e52]:
+        - button "Deselect all" [ref=e53] [cursor=pointer]
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - button "Upload receipt files" [ref=e56]
+            - generic [ref=e57] [cursor=pointer]:
+              - img [ref=e58]
+              - generic [ref=e63]: Upload receipt files
+          - button "Show add file options" [ref=e64] [cursor=pointer]:
+            - img [ref=e65]
+        - button "Extract 1 file" [ref=e67] [cursor=pointer]
+    - dialog [ref=e68]:
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - heading "Receipt Preview" [level=2] [ref=e71]
+          - button "Close preview" [ref=e72] [cursor=pointer]:
+            - img [ref=e73]
+        - generic [ref=e76]:
+          - img "Preview of appIcon.png" [ref=e77]
+          - generic [ref=e78]:
+            - generic [ref=e79]:
+              - term [ref=e80]: Filename
+              - definition [ref=e81]: appIcon.png
+            - generic [ref=e82]:
+              - term [ref=e83]: Size
+              - definition [ref=e84]: 0.02 MB
+            - generic [ref=e85]:
+              - term [ref=e86]: Type
+              - definition [ref=e87]: image/png
+  - alert [ref=e15]

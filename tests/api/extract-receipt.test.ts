@@ -365,15 +365,51 @@ describe("POST /api/extract-receipt", () => {
     expect(fetch).toHaveBeenCalledTimes(15);
   });
 
-  it("returns 502 when Gemini returns invalid JSON", async () => {
+  it("returns needs-review fallback when Gemini returns invalid JSON", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     mockGeminiResponse("I cannot read this receipt.");
 
     const response = await POST(createRequest(createImageFile()));
     const body = await readJson(response);
 
-    expect(response.status).toBe(502);
-    expect(body.code).toBe("INVALID_AI_RESPONSE");
-    expect(body.error).toContain("JSON object");
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      merchantName: null,
+      receiptType: null,
+      date: null,
+      totalAmount: null,
+      currency: null,
+      confidence: "low",
+      notes: ["Gemini did not return structured receipt JSON. Please inspect the image and enter the fields manually."],
+      items: []
+    });
+  });
+
+  it("returns needs-review fallback when Gemini returns no text", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{ content: { parts: [] } }]
+        })
+      }))
+    );
+
+    const response = await POST(createRequest(createImageFile()));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      confidence: "low",
+      notes: [
+        "Gemini returned an empty response. Please inspect the receipt image and enter the fields manually."
+      ]
+    });
+    expect(JSON.stringify(body.data)).toContain(
+      "Gemini returned an empty response. Please inspect the receipt image and enter the fields manually."
+    );
   });
 });

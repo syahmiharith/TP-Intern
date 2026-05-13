@@ -1,4 +1,4 @@
-import { ReceiptExtraction, ExtractionErrorCode } from "@/lib/receipt";
+import { ReceiptExtraction, ExtractionErrorCode, receiptExtractionSchema } from "@/lib/receipt";
 import { normalizeReceiptExtraction } from "@/lib/receipt-normalizer";
 
 const GEMINI_REQUEST_TIMEOUT_MS = 20_000;
@@ -104,6 +104,19 @@ function getGeminiPublicErrorMessage(status: number, providerMessage?: string) {
   return providerMessage || "Gemini extraction request failed.";
 }
 
+function buildNeedsReviewFallback(note: string): ReceiptExtraction {
+  return receiptExtractionSchema.parse({
+    merchantName: null,
+    receiptType: null,
+    currency: null,
+    totalAmount: null,
+    date: null,
+    confidence: "low",
+    notes: [note],
+    items: []
+  });
+}
+
 export async function extractReceiptFromImage({
   file,
   apiKey,
@@ -177,13 +190,20 @@ export async function extractReceiptFromImage({
     .trim();
 
   if (!modelText) {
-    throw new ReceiptExtractionError("INVALID_AI_RESPONSE", "Gemini returned an empty response.", 502);
+    return buildNeedsReviewFallback(
+      "Gemini returned an empty response. Please inspect the receipt image and enter the fields manually."
+    );
   }
 
   try {
     return normalizeReceiptExtraction(JSON.parse(extractJsonText(modelText)));
   } catch (error) {
-    if (error instanceof ReceiptExtractionError) throw error;
+    if (error instanceof ReceiptExtractionError) {
+      return buildNeedsReviewFallback(
+        "Gemini did not return structured receipt JSON. Please inspect the image and enter the fields manually."
+      );
+    }
+
     throw new ReceiptExtractionError(
       "INVALID_AI_RESPONSE",
       error instanceof Error ? error.message : "Gemini returned an invalid response.",

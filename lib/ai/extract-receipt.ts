@@ -1,7 +1,7 @@
 import { ReceiptExtraction, ExtractionErrorCode, receiptExtractionSchema } from "@/lib/receipt";
 import { normalizeReceiptExtraction } from "@/lib/receipt-normalizer";
 
-const GEMINI_REQUEST_TIMEOUT_MS = 20_000;
+const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
 
 const EXTRACTION_PROMPT = `You are a careful receipt data extraction assistant.
 

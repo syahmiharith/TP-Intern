@@ -4,6 +4,8 @@ Gemini-powered receipt extraction web app built for the TP Malaysia AI Intern as
 
 **Open the live assessment app:** <https://tp-intern-malaysia.vercel.app/>
 
+**Watch the 1-2 minute demo:** [syahmiharith-ai-intern-assessment.mp4](./docs/demo/syahmiharith-ai-intern-assessment.mp4)
+
 **Setup shortcuts:** [Getting Started](#getting-started) · [Deployment](#deployment)
 
 **Reviewer docs:** [Testing Guide](./TESTING.md) · [Assessment Handoff](./docs/ASSESSMENT_HANDOFF.md) · [Demo Script](./docs/DEMO_SCRIPT.md)

@@ -4,7 +4,7 @@ Gemini-powered receipt extraction and human-review web app. The app turns receip
 
 **Run the app:** follow [Getting Started](#getting-started).
 
-**Existing hosted demo:** <https://tp-intern-malaysia.vercel.app/> (legacy deployment address; hosting has not been renamed).
+**Live demo:** <https://receipt-to-form-syahmiharith.vercel.app/>
 
 **Walkthrough:** [Demo Script](./docs/DEMO_SCRIPT.md). The earlier recording is retained in Git history, not presented as a current UI demonstration.
 

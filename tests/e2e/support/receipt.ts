@@ -247,3 +247,21 @@ export async function createGeneratedReceiptPng(page: Page) {
     buffer: Buffer.from(base64, "base64")
   };
 }
+
+export async function storedImageCount(page: Page) {
+  return page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const open = indexedDB.open("receipt-expenses");
+    open.onsuccess = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains("images")) {
+        db.close(); reject(new Error("Saved image store is unavailable")); return;
+      }
+      const transaction = db.transaction("images", "readonly");
+      const count = transaction.objectStore("images").count();
+      count.onsuccess = () => resolve(count.result);
+      count.onerror = () => reject(count.error);
+      transaction.oncomplete = () => db.close();
+    };
+    open.onerror = () => reject(open.error);
+  }));
+}

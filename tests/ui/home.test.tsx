@@ -66,7 +66,7 @@ describe("Home page receipt queue", () => {
 
     await uploadFiles([new File(["hello"], "notes.txt", { type: "text/plain" })]);
 
-    expect(screen.getByText(/unsupported file type/i)).toBeInTheDocument();
+    expect(await screen.findByText(/unsupported file type/i)).toBeInTheDocument();
     expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
   });
 

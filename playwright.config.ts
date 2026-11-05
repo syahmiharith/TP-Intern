@@ -32,7 +32,7 @@ export default defineConfig({
     },
     {
       name: "mobile-safari",
-      testMatch: /responsive-smoke\.spec\.ts/,
+      testMatch: /(?:responsive-smoke|expense-workflow|runtime-verification)\.spec\.ts/,
       use: { ...devices["iPhone 13"] }
     }
   ]

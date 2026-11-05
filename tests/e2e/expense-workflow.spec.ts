@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { storedImageCount } from "./support/receipt";
 
 test("reviewed corrections survive refresh and CSV uses current reviewed values", async ({ page }) => {
   await page.goto("/");
@@ -58,10 +59,10 @@ test("deletion persists and unavailable storage is explained", async ({ page }) 
 test("expired saved receipts are removed on return", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Try two sample receipts" }).click();
-  await page.waitForTimeout(300);
+  await expect.poll(() => storedImageCount(page)).toBe(2);
   await page.evaluate(async () => {
     await new Promise<void>((resolve, reject) => {
-      const open = indexedDB.open("receipt-expenses", 1);
+      const open = indexedDB.open("receipt-expenses");
       open.onsuccess = () => {
         const db = open.result;
         const transaction = db.transaction("batches", "readwrite");
@@ -81,6 +82,7 @@ test("expired saved receipts are removed on return", async ({ page }) => {
   await expect(page.getByText("Upload receipt files")).toBeVisible();
   await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled();
   await expect(page.getByText("Sample cafe.png", { exact: true })).toHaveCount(0);
+  await expect.poll(() => storedImageCount(page)).toBe(0);
 });
 
 test("mixed batch retries failures without replacing successful receipts", async ({ page }) => {

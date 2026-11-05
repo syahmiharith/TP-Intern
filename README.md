@@ -309,3 +309,10 @@ Pilot evidence is pending. Observe five expense preparers processing three synth
 Transient provider failures (HTTP 500/502/503/504) get one retry after a short backoff, preserving the initial 45-second timeout and limiting the retry to 10 seconds. Every attempt reserves shared budget before calling Gemini. Quota and credential failures return immediately. Model name, structured provider status and request ID support diagnosis without receipt content or keys in logs.
 
 Pin `GEMINI_MODEL=gemini-2.5-flash` for this release. Live preview verification succeeded with this model after the movable latest alias and tested newer models returned UNAVAILABLE. The live Playwright scenario now checks extraction, reviewed CSV/JSON values, original confidence, source identity and review recovery after refresh.
+
+
+## Runtime verification coverage
+
+Runtime checks cover notes and formula-safe CSV/JSON round trips, keyboard preview focus, interrupted extraction, stop/resume, duplicate files, the five-receipt limit, storage quota failure, unsupported saved records, currency minor units, and legacy saved-data migration. CI runs the expense and runtime recovery checks in mobile WebKit as well as Chromium.
+
+Saved records now use schema version 2 with image bytes in a separate IndexedDB image store. This supports WebKit runtimes that reject persisted Blob/File objects and avoids rewriting image bytes for each field correction. Existing schema-1 records migrate with corrections, review status and source identity retained. Images and queue metadata are committed together, and removed or expired receipts release their stored images.

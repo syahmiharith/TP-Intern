@@ -11,10 +11,11 @@ describe("expense contracts", () => {
     expect(validateReceiptForm({ ...values, currency: "JPY", totalAmount: "1.50" }).totalAmount).toBeTruthy();
   });
   it("escapes Unicode, quotes, newlines and formula prefixes", () => {
-    const csv = expensesCsv([{ id: "source-id", source: "source.png", values: { ...values, merchantName: '=HYPERLINK("x")', notes: "서울,\n台北" }, reviewedAt: "now" }]);
+    const csv = expensesCsv([{ id: "source-id", source: "source.png", values: { ...values, merchantName: '=HYPERLINK("x")', currency: " usd ", notes: "서울,\n台北" }, reviewedAt: "now" }]);
     expect(csv).toContain('"\'=HYPERLINK(""x"")"');
     expect(csv).toContain('"서울,\n台北"');
     expect(csv).toContain('"source-id"');
+    expect(csv).toContain('"USD"');
   });
   it("never upgrades model confidence during correction", () => {
     expect(formValuesToExtraction(values, { merchantName: null, receiptType: null, date: null, currency: null, totalAmount: null, notes: [], items: [], confidence: "low" }).confidence).toBe("low");

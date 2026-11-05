@@ -1,7 +1,7 @@
 import { ReceiptExtraction, ExtractionErrorCode, receiptExtractionSchema } from "@/lib/receipt";
 import { normalizeReceiptExtraction } from "@/lib/receipt-normalizer";
 
-const GEMINI_REQUEST_TIMEOUT_MS = 15_000;
+const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
 
 const EXTRACTION_PROMPT = `You are a careful receipt data extraction assistant.
 
@@ -128,7 +128,7 @@ type ExtractReceiptOptions = {
 };
 
 export async function extractReceiptFromImage(options: ExtractReceiptOptions): Promise<ReceiptExtraction> {
-  const attemptOptions = { ...options, timeoutMs: options.timeoutMs ?? 15_000 };
+  const attemptOptions = { ...options, timeoutMs: options.timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS };
   try {
     return await extractReceiptAttempt(attemptOptions);
   } catch (error) {
@@ -142,7 +142,7 @@ export async function extractReceiptFromImage(options: ExtractReceiptOptions): P
       status: error.status,
       providerStatus: error.providerStatus
     });
-    return extractReceiptAttempt(attemptOptions);
+    return extractReceiptAttempt({ ...attemptOptions, timeoutMs: Math.min(attemptOptions.timeoutMs, 10_000) });
   }
 }
 

@@ -253,6 +253,27 @@ describe("POST /api/extract-receipt", () => {
     });
   });
 
+  it("extracts stateless image results using Gemini Interactions", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GEMINI_API_MODE = "interactions";
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ steps: [
+      { type: "thought", content: [{ type: "text", text: "ignored" }] },
+      { type: "model_output", content: [{ type: "text", text: JSON.stringify({
+        merchantName: "Cafe", receiptType: "Other", date: "2026-11-06", currency: "USD", totalAmount: 12, confidence: "low", notes: [], items: []
+      }) }] }
+    ] }));
+    vi.stubGlobal("fetch", fetch);
+    const response = await POST(createRequest(createImageFile()));
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.merchantName).toBe("Cafe");
+    expect(fetch.mock.calls[0]?.[0]).toBe("https://generativelanguage.googleapis.com/v1beta/interactions");
+    const options = fetch.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(options.body as string)).toMatchObject({ store: false, input: [
+      { type: "text" }, { type: "image", mime_type: "image/png" }
+    ] });
+    expect(options.headers).toMatchObject({ "x-goog-api-key": "test-key", "Api-Revision": "2026-05-20" });
+  });
+
   it("logs structured provider diagnostics without raw error content", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});

@@ -9,7 +9,6 @@ import {
 import { checkReceiptExtractionRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
-export const preferredRegion = "iad1";
 
 type ErrorBody = {
   code: ExtractionErrorCode;
@@ -78,6 +77,7 @@ async function extract(request: Request, requestId: string) {
     console.info("[receipt-extraction] file validation passed");
     console.info("[receipt-extraction] ai call started", {
       requestId,
+      apiMode: process.env.GEMINI_API_MODE === "interactions" ? "interactions" : "generateContent",
       model: /^gemini-[a-zA-Z0-9._-]+$/.test(model) ? model : "unrecognized-model-setting"
     });
 

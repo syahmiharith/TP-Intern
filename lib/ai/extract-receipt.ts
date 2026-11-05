@@ -50,10 +50,6 @@ Rules:
 - Add short notes for uncertainty, unreadable fields, or assumptions.`;
 
 type GeminiResponse = {
-  steps?: Array<{
-    type: string;
-    content?: Array<{ type: string; text?: string }>;
-  }>;
   candidates?: Array<{
     content?: {
       parts?: Array<{
@@ -153,26 +149,7 @@ export async function extractReceiptFromImage(options: ExtractReceiptOptions): P
 async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: ExtractReceiptOptions): Promise<ReceiptExtraction> {
   const arrayBuffer = await file.arrayBuffer();
   const base64Image = Buffer.from(arrayBuffer).toString("base64");
-  const interactions = process.env.GEMINI_API_MODE === "interactions";
-  const endpoint = interactions
-    ? "https://generativelanguage.googleapis.com/v1beta/interactions"
-    : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const legacyBody = {
-    contents: [{ role: "user", parts: [
-      { text: EXTRACTION_PROMPT },
-      { inline_data: { mime_type: file.type, data: base64Image } }
-    ] }],
-    generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
-  };
-  const interactionBody = {
-    model,
-    store: false,
-    input: [
-      { type: "text", text: EXTRACTION_PROMPT },
-      { type: "image", mime_type: file.type, data: base64Image }
-    ],
-    response_format: { type: "text", mime_type: "application/json" }
-  };
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS);
 
@@ -183,11 +160,29 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-        ...(interactions ? { "Api-Revision": "2026-05-20" } : {})
+        "x-goog-api-key": apiKey
       },
       signal: controller.signal,
-      body: JSON.stringify(interactions ? interactionBody : legacyBody)
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: EXTRACTION_PROMPT },
+              {
+                inline_data: {
+                  mime_type: file.type,
+                  data: base64Image
+                }
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json"
+        }
+      })
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -214,13 +209,10 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
     throw error;
   }
 
-  const modelText = interactions
-    ? geminiJson.steps?.filter((step) => step.type === "model_output")
-      .flatMap((step) => step.content ?? [])
-      .filter((part) => part.type === "text")
-      .map((part) => part.text ?? "").join("").trim()
-    : geminiJson.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text ?? "").join("").trim();
+  const modelText = geminiJson.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text ?? "")
+    .join("")
+    .trim();
 
   if (!modelText) {
     return buildNeedsReviewFallback(

@@ -305,3 +305,5 @@ Production live extraction requires `GEMINI_API_KEY` and Redis REST credentials.
 Release verification requires the automated checks, deployed sample correction and CSV download, and a separate synthetic real-provider receipt. Roll back the deployment if exports differ from reviewed values or storage recovery loses edits. Never log receipt contents.
 
 Pilot evidence is pending. Observe five expense preparers processing three synthetic receipts and opening the CSV in their usual spreadsheet. Record unaided completion counts, errors, time versus manual entry and cleanup. Retest shipped improvements with affected participants and record voluntary return use separately. No participant results are claimed by this release.
+
+Transient provider failures (HTTP 500/502/503/504) get one retry after a short backoff, with a 15-second timeout per attempt. Every attempt reserves shared budget before calling Gemini. Quota and credential failures return immediately. Model name, structured provider status and request ID support diagnosis without receipt content or keys in logs.

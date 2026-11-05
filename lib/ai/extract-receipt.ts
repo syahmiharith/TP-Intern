@@ -59,12 +59,14 @@ type GeminiResponse = {
   }>;
   error?: {
     message?: string;
+    status?: string;
   };
 };
 
 export class ReceiptExtractionError extends Error {
   code: ExtractionErrorCode;
   status: number;
+  providerStatus?: string;
 
   constructor(code: ExtractionErrorCode, message: string, status: number) {
     super(message);
@@ -177,11 +179,16 @@ export async function extractReceiptFromImage({
   const geminiJson = (await geminiResponse.json()) as GeminiResponse;
 
   if (!geminiResponse.ok) {
-    throw new ReceiptExtractionError(
+    const error = new ReceiptExtractionError(
       "AI_PROVIDER_ERROR",
       getGeminiPublicErrorMessage(geminiResponse.status, geminiJson.error?.message),
       geminiResponse.status
     );
+    const providerStatus = geminiJson.error?.status;
+    if (providerStatus && /^[A-Z_]{1,64}$/.test(providerStatus)) {
+      error.providerStatus = providerStatus;
+    }
+    throw error;
   }
 
   const modelText = geminiJson.candidates?.[0]?.content?.parts

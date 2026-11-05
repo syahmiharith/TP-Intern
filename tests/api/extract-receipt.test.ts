@@ -253,6 +253,22 @@ describe("POST /api/extract-receipt", () => {
     });
   });
 
+  it("logs structured provider diagnostics without raw error content", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({ error: { status: "UNAVAILABLE", message: "private provider detail" } })
+    })));
+    const response = await POST(createRequest(createImageFile()));
+    expect(response.status).toBe(503);
+    expect(warning).toHaveBeenCalledWith("[receipt-extraction] extraction failed", expect.objectContaining({
+      code: "AI_PROVIDER_ERROR", status: 503, providerStatus: "UNAVAILABLE"
+    }));
+    expect(JSON.stringify(warning.mock.calls)).not.toContain("private provider detail");
+  });
+
   it("passes through Gemini API failures safely", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     vi.stubGlobal(

@@ -75,7 +75,10 @@ async function extract(request: Request, requestId: string) {
     const receiptFile = receipt as File;
 
     console.info("[receipt-extraction] file validation passed");
-    console.info("[receipt-extraction] ai call started");
+    console.info("[receipt-extraction] ai call started", {
+      requestId,
+      model: /^gemini-[a-zA-Z0-9._-]+$/.test(model) ? model : "unrecognized-model-setting"
+    });
 
     const extraction = await extractReceiptFromImage({
       file: receiptFile,
@@ -89,7 +92,9 @@ async function extract(request: Request, requestId: string) {
     return jsonResponse({ data: extraction, requestId, extractedAt: new Date().toISOString(), warnings: Object.entries(validateReceiptForm(extractionToFormValues(extraction))).map(([field, message]) => ({ field, message })) });
   } catch (error) {
     if (error instanceof ReceiptExtractionError) {
-      console.warn("[receipt-extraction] extraction failed", { code: error.code, status: error.status });
+      console.warn("[receipt-extraction] extraction failed", {
+        requestId, code: error.code, status: error.status, providerStatus: error.providerStatus
+      });
       return errorResponse(error.code, error.message, error.status);
     }
 

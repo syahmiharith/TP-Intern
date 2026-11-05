@@ -23,8 +23,8 @@ test.describe("receipt queue item controls", () => {
 
     await page.getByRole("button", { name: /Delete first-receipt.png/i }).click();
 
-    await expect(page.getByText("first-receipt.png")).toBeHidden();
-    await expect(page.getByText("second-receipt.png")).toBeVisible();
+    await expect(page.getByText("first-receipt.png", { exact: true })).toBeHidden();
+    await expect(page.getByText("second-receipt.png", { exact: true })).toBeVisible();
     await expect(page.getByText(/1 selected/i)).toBeVisible();
     await expect(page.getByText(/1 \/ 5 files/i)).toBeHidden();
     await expect(page.getByText("Receipt removed.")).toBeVisible();

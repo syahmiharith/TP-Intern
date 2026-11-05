@@ -293,3 +293,15 @@ http://localhost:3000
 ## Project Origin
 
 Originally developed as a recruitment assessment, this repository is presented as a portfolio project. It is not a production client system or a claim of employment. The original development history and MIT license are preserved.
+
+## Expense review release
+
+Try two synthetic receipts without a provider call. Correct the stationery receipt against its image, save the change, mark it reviewed, and export expenses CSV. Editing a reviewed receipt blocks its export until it is saved and reviewed again. Discard restores the saved revision and its review status. Original model confidence remains separate from human review.
+
+Images, pending edits, saved revisions and review status are stored in IndexedDB on this device, expiring seven days after editing. Browser storage can be evicted. Delete batch clears stored work. Interrupted extraction requires a manual retry. Expanded item editing and item CSV are deferred pending pilot evidence.
+
+Production live extraction requires `GEMINI_API_KEY`, `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The Redis REST service must support EVAL. Reservations enforce 15 requests per IP per UTC minute and a global UTC daily budget, configured with `PROVIDER_DAILY_BUDGET` (default 100). Missing or unavailable budget storage blocks live extraction while samples remain available. Use the deployment platform's trusted proxy headers for client IPs.
+
+Release verification requires the automated checks, deployed sample correction and CSV download, and a separate synthetic real-provider receipt. Roll back the deployment if exports differ from reviewed values or storage recovery loses edits. Never log receipt contents.
+
+Pilot evidence is pending. Observe five expense preparers processing three synthetic receipts and opening the CSV in their usual spreadsheet. Record unaided completion counts, errors, time versus manual entry and cleanup. Retest shipped improvements with affected participants and record voluntary return use separately. No participant results are claimed by this release.

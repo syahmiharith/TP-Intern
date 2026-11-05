@@ -2,14 +2,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 
+vi.mock("@/lib/expense-workflow", async (importOriginal) => ({ ...await importOriginal<object>(), readBatch: vi.fn(async () => []), writeBatch: vi.fn(async () => {}) }));
+
 function createImageFile(name = "receipt.png") {
-  return new File(["fake image content"], name, { type: "image/png" });
+  return new File([name], name, { type: "image/png" });
 }
 
-function uploadFiles(files: File[]) {
+async function uploadFiles(files: File[]) {
+  await waitFor(() => expect(screen.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled());
   const input = document.querySelector('input[type="file"]') as HTMLInputElement | null;
   if (!input) throw new Error("File input was not found");
   fireEvent.change(input, { target: { files } });
+  if (files[0]?.type === "image/png") await screen.findByText(files[0].name);
 }
 
 const completeExtraction = {
@@ -47,31 +51,31 @@ describe("Home page receipt queue", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts with only the upload area", () => {
+  it("starts with only the upload area", async () => {
     render(<Home />);
 
     expect(screen.getByText("Upload receipt files")).toBeInTheDocument();
     expect(screen.getByText(/JPG, PNG, WEBP/i)).toBeInTheDocument();
     expect(screen.getByText("Receipt-to-Form")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Human-reviewed AI receipt extraction/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Turn receipts into expense records/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Extract/i })).not.toBeInTheDocument();
   });
 
-  it("rejects unsupported file types before adding queue items", () => {
+  it("rejects unsupported file types before adding queue items", async () => {
     render(<Home />);
 
-    uploadFiles([new File(["hello"], "notes.txt", { type: "text/plain" })]);
+    await uploadFiles([new File(["hello"], "notes.txt", { type: "text/plain" })]);
 
     expect(screen.getByText(/unsupported file type/i)).toBeInTheDocument();
     expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
   });
 
-  it("adds valid uploads as selected queue items with footer extraction", () => {
+  it("adds valid uploads as selected queue items with footer extraction", async () => {
     render(<Home />);
 
-    uploadFiles([createImageFile("receipt-1.png"), createImageFile("receipt-2.png")]);
+    await uploadFiles([createImageFile("receipt-1.png"), createImageFile("receipt-2.png")]);
 
-    expect(screen.getByRole("heading", { name: /Human-reviewed AI receipt extraction/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Turn receipts into expense records/i })).toBeInTheDocument();
     expect(screen.getByText("receipt-1.png")).toBeInTheDocument();
     expect(screen.getByText("receipt-2.png")).toBeInTheDocument();
     expect(screen.getByText(/2 selected/i)).toBeInTheDocument();
@@ -79,10 +83,10 @@ describe("Home page receipt queue", () => {
     expect(screen.queryByRole("button", { name: /Extract receipt-1.png/i })).not.toBeInTheDocument();
   });
 
-  it("deletes an item and frees an upload slot", () => {
+  it("deletes an item and frees an upload slot", async () => {
     render(<Home />);
 
-    uploadFiles([createImageFile("receipt-1.png"), createImageFile("receipt-2.png")]);
+    await uploadFiles([createImageFile("receipt-1.png"), createImageFile("receipt-2.png")]);
     fireEvent.click(screen.getByRole("button", { name: /Delete receipt-1.png/i }));
 
     expect(screen.queryByText("receipt-1.png")).not.toBeInTheDocument();
@@ -101,7 +105,7 @@ describe("Home page receipt queue", () => {
     );
 
     render(<Home />);
-    uploadFiles([createImageFile("aeon-receipt.png")]);
+    await uploadFiles([createImageFile("aeon-receipt.png")]);
 
     fireEvent.click(screen.getByRole("button", { name: /Extract 1 file/i }));
 
@@ -109,6 +113,7 @@ describe("Home page receipt queue", () => {
       expect(screen.getByText(/Extracted · high/i)).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
     expect(screen.getByText(/AEON Wellness · MYR 43.80 · 2026-05-12/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download result for aeon-receipt.png/i })).toBeInTheDocument();
   });
@@ -123,7 +128,7 @@ describe("Home page receipt queue", () => {
     );
 
     render(<Home />);
-    uploadFiles([createImageFile("blurry-receipt.png")]);
+    await uploadFiles([createImageFile("blurry-receipt.png")]);
 
     fireEvent.click(screen.getByRole("button", { name: /Extract 1 file/i }));
     expect(await screen.findByText(/Needs review/i)).toBeInTheDocument();
@@ -143,13 +148,13 @@ describe("Home page receipt queue", () => {
     fireEvent.change(screen.getByLabelText("Total Amount"), { target: { value: "43.80" } });
     fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
 
-    expect(screen.getByText(/Edited/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
     expect(screen.getByRole("button", { name: /Download result for blurry-receipt.png/i })).toBeInTheDocument();
   });
 
-  it("opens the preview modal from the row icon", () => {
+  it("opens the preview modal from the row icon", async () => {
     render(<Home />);
-    uploadFiles([createImageFile("receipt-preview.png")]);
+    await uploadFiles([createImageFile("receipt-preview.png")]);
 
     fireEvent.click(screen.getByRole("button", { name: /Preview receipt-preview.png/i }));
 

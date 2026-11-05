@@ -47,7 +47,8 @@ test.describe("receipt extraction queue behavior", () => {
       await extractButton(page, /Extract 1 file/i).click();
 
       await expect(page.getByText(summary)).toBeVisible();
-      await expect(page.getByRole("button", { name: /Download result for sample-receipt.png/i })).toBeVisible();
+      await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
+    await expect(page.getByRole("button", { name: /Download result for sample-receipt.png/i })).toBeVisible();
     });
   }
 

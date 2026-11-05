@@ -24,6 +24,7 @@ test.describe("responsive receipt queue smoke", () => {
     await extractButton(page, /Extract 1 file/i).click();
 
     await expect(page.getByText(/FamilyMart · KRW 12000.00 · 2026-05-11/i)).toBeVisible();
+    await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
     await expect(page.getByRole("button", { name: /Download result for sample-receipt.png/i })).toBeVisible();
 
     await expandCurrentReceipt(page);

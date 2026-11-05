@@ -1,4 +1,6 @@
 "use client";
+import { readBatch, writeBatch, expensesCsv, sampleReceipt } from "@/lib/expense-workflow";
+
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
@@ -21,7 +23,7 @@ import {
   allowedReceiptImageTypes,
   emptyReceiptForm,
   extractionToFormValues,
-  formValuesToExtraction,
+
   isExtractionComplete,
   maxReceiptImageSizeBytes,
   receiptTypes,
@@ -31,8 +33,13 @@ import {
 type QueueStatus = "ready" | "extracting" | "extracted" | "needs-review" | "failed" | "edited";
 type FieldErrors = Partial<Record<keyof ReceiptFormValues, string>>;
 
-type ReceiptQueueItem = {
+export type ReceiptQueueItem = {
   id: string;
+  savedValues?: ReceiptFormValues;
+  reviewedAt?: string;
+  editedAt?: number;
+  extractedAt?: string;
+  requestId?: string;
   file: File;
   previewUrl: string;
   selected: boolean;
@@ -49,6 +56,8 @@ type ReceiptQueueItem = {
 
 type ExtractApiResponse = {
   data?: ReceiptExtraction;
+  extractedAt?: string;
+  requestId?: string;
   code?: string;
   error?: string;
 };
@@ -88,24 +97,17 @@ function statusLabel(item: ReceiptQueueItem) {
 }
 
 function isCompleteItem(item: ReceiptQueueItem) {
-  return isExtractionComplete(item.extraction);
+  return Boolean(item.reviewedAt && item.savedValues && JSON.stringify(item.savedValues) === JSON.stringify(item.formValues) && Object.keys(validateReceiptForm(item.formValues)).length === 0);
 }
 
 function buildDownloadPayload(item: ReceiptQueueItem) {
   if (!item.extraction) return null;
 
-  return {
-    fileName: item.file.name,
-    extractedAt: new Date().toISOString(),
-    merchantName: item.extraction.merchantName,
-    receiptType: item.extraction.receiptType,
-    currency: item.extraction.currency,
-    totalAmount: item.extraction.totalAmount,
-    date: item.extraction.date,
-    confidence: item.extraction.confidence,
-    notes: item.extraction.notes,
-    items: item.extraction.items
-  };
+  return { schemaVersion: 1, receiptId: item.id, fileName: item.file.name,
+    extractedAt: item.extractedAt, requestId: item.requestId,
+    originalExtraction: item.extraction, reviewedValues: item.savedValues,
+    reviewedAt: item.reviewedAt, confidence: item.extraction.confidence };
+
 }
 
 function downloadJson(fileName: string, payload: unknown) {
@@ -216,24 +218,6 @@ function AppHeader() {
   );
 }
 
-function PersistentHero() {
-  return (
-    <section className="sticky top-[45px] z-30 border-b border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
-            Human-reviewed AI receipt extraction
-          </h1>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600 sm:text-sm">
-            Upload receipt images, extract merchant, date, total, currency, receipt type, and line items with Gemini,
-            then review uncertain fields before downloading complete structured JSON.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function AddFileButton({ canAddMore, onFiles }: { canAddMore: boolean; onFiles: (files: FileList | null) => void }) {
   return (
     <UploadDropzone canAddMore={canAddMore} compact onFiles={onFiles} />
@@ -241,18 +225,22 @@ function AddFileButton({ canAddMore, onFiles }: { canAddMore: boolean; onFiles: 
 }
 
 function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClose: () => void }) {
+  const [rotation, setRotation] = useState(0);
+  const [zoom, setZoom] = useState(1);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-bold text-slate-950">Receipt Preview</h2>
+          <button onClick={() => setRotation((value) => value + 90)}>Rotate</button>
+          <button onClick={() => setZoom((value) => value === 1 ? 2 : 1)}>Toggle zoom</button>
           <IconButton label="Close preview" onClick={onClose}>
             <X className="h-4 w-4" aria-hidden="true" />
           </IconButton>
         </div>
         <div className="max-h-[70vh] overflow-auto p-5">
           {/* eslint-disable-next-line @next/next/no-img-element -- Blob preview URLs cannot be optimized by next/image. */}
-          <img src={item.previewUrl} alt={`Preview of ${item.file.name}`} className="mx-auto max-h-[58vh] w-auto rounded-xl border border-slate-200 object-contain" />
+          <img src={item.previewUrl} style={{ transform: `rotate(${rotation}deg) scale(${zoom})` }} alt={`Preview of ${item.file.name}`} className="mx-auto max-h-[58vh] w-auto rounded-xl border border-slate-200 object-contain" />
           <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
             <div>
               <dt className="font-semibold text-slate-500">Filename</dt>
@@ -283,16 +271,18 @@ function ExpandedReceiptDetails({
   onSave: (id: string) => void;
 }) {
   const reviewRequired = item.status === "needs-review";
+  const [showImage, setShowImage] = useState(false);
 
   return (
     <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2.5">
+      <button className="lg:hidden" aria-pressed={showImage} onClick={() => setShowImage((value) => !value)}>{showImage ? "Show form" : "Show receipt image"}</button>
       <h3 className="text-sm font-bold text-slate-950">{reviewRequired ? "Review Required" : "Receipt Details"}</h3>
       {reviewRequired ? (
         <p className="mt-0.5 text-xs text-slate-600">Some fields could not be extracted confidently. Please check manually.</p>
       ) : null}
 
-      <div className={clsx("mt-2 grid gap-3", reviewRequired && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
-        <div className={clsx(reviewRequired && "order-2 lg:order-1")}>
+      <div className={clsx("mt-2 grid gap-3", "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
+        <div className={clsx("lg:block", showImage && "hidden")}>
           <div className="grid gap-2 lg:grid-cols-2">
             <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange} />
             <label className="space-y-1">
@@ -384,8 +374,8 @@ function ExpandedReceiptDetails({
           </button>
         </div>
 
-        {reviewRequired ? (
-          <aside className="order-1 rounded-xl border border-rose-100 bg-white p-2 lg:order-2 lg:sticky lg:top-32 lg:self-start">
+        {true ? (
+          <aside className={clsx("rounded-xl border border-rose-100 bg-white p-2 lg:block lg:sticky lg:top-32 lg:self-start", !showImage && "hidden")}>
             <p className="mb-2 text-xs font-semibold text-slate-700">Receipt image</p>
             <div className="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-50">
               {/* eslint-disable-next-line @next/next/no-img-element -- Blob preview URLs cannot be optimized by next/image. */}
@@ -572,7 +562,7 @@ function ReceiptQueueItemRow({
 
       {item.status === "extracting" ? (
         <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-100">
-          <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${item.progress}%` }} />
+          <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: item.status === "extracting" ? "100%" : "0%" }} />
         </div>
       ) : null}
     </article>
@@ -622,8 +612,8 @@ function FloatingBatchFooter({
         <div className="flex flex-wrap items-center gap-2">
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
           {canDownloadSelected ? (
-            <button type="button" onClick={onDownload} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.14)] focus:outline-none focus:ring-2 focus:ring-emerald-500" title="Only complete extractions can be downloaded.">
-              Download selected
+            <button type="button" onClick={onDownload} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.14)] focus:outline-none focus:ring-2 focus:ring-emerald-500" title="Only current reviewed receipts can be exported.">
+              Export selected CSV
             </button>
           ) : null}
           <button
@@ -645,6 +635,12 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [previewItemId, setPreviewItemId] = useState<string | null>(null);
   const [removedToast, setRemovedToast] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const storageReady = useRef(false);
+  const stopRequested = useRef(false);
+  const extracting = useRef(false);
+  const uploading = useRef(false);
   const progressTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const itemsRef = useRef<ReceiptQueueItem[]>([]);
 
@@ -654,8 +650,23 @@ export default function Home() {
     [selectedItems]
   );
   const completeSelectedItems = useMemo(() => selectedItems.filter(isCompleteItem), [selectedItems]);
-  const canAddMore = items.length < maxFiles;
+  const canAddMore = hydrated && !busy && items.length < maxFiles;
   const previewItem = items.find((item) => item.id === previewItemId) ?? null;
+
+  useEffect(() => {
+    readBatch().then((saved) => {
+      storageReady.current = true;
+      setItems(saved.map((item) => ({ ...item, previewUrl: URL.createObjectURL(item.file),
+        status: item.status === "extracting" ? "failed" : item.status,
+        errorMessage: item.status === "extracting" ? "Extraction interrupted. Retry when ready." : item.errorMessage })));
+    }).catch(() => setErrorMessage("Saved data could not be opened. Could not save on this device. You can continue in this tab or clear saved data."))
+      .finally(() => setHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || !storageReady.current) return;
+    writeBatch(items).catch(() => setErrorMessage("Could not save on this device. Keep this tab open and export reviewed receipts before leaving."));
+  }, [items, hydrated]);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -677,25 +688,29 @@ export default function Home() {
     updateItem(id, (item) => ({ ...item, resultSeen: true, isNewResult: false }));
   }
 
-  function handleFiles(files: FileList | null) {
-    if (!files?.length) return;
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length || uploading.current || !hydrated) return;
+    uploading.current = true;
 
     const nextItems: ReceiptQueueItem[] = [];
     const errors: string[] = [];
     const remainingSlots = maxFiles - items.length;
 
-    Array.from(files)
-      .slice(0, remainingSlots)
-      .forEach((file) => {
+    for (const file of Array.from(files).slice(0, remainingSlots)) {
         if (!allowedReceiptImageTypes.includes(file.type as (typeof allowedReceiptImageTypes)[number])) {
           errors.push(`${file.name}: unsupported file type.`);
-          return;
+          continue;
         }
 
         if (file.size > maxReceiptImageSizeBytes) {
           errors.push(`${file.name}: file is larger than 5MB.`);
-          return;
+          continue;
         }
+
+        const fingerprint = (value: File) => new Promise<string>((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => resolve(crypto.randomUUID()); reader.readAsDataURL(value); });
+        const hash = await fingerprint(file);
+        const hashes = await Promise.all([...items, ...nextItems].map((item) => fingerprint(item.file)));
+        if (hashes.includes(hash)) { errors.push(`${file.name}: identical file skipped.`); continue; }
 
         nextItems.push({
           id: createQueueItemId(),
@@ -704,6 +719,7 @@ export default function Home() {
           selected: true,
           expanded: false,
           status: "ready",
+          editedAt: Date.now(),
           progress: 0,
           extraction: null,
           formValues: emptyReceiptForm,
@@ -712,7 +728,7 @@ export default function Home() {
           isNewResult: false,
           resultSeen: false
         });
-      });
+      }
 
     if (files.length > remainingSlots) {
       errors.push(`Only ${remainingSlots} upload ${remainingSlots === 1 ? "slot is" : "slots are"} available.`);
@@ -720,6 +736,12 @@ export default function Home() {
 
     setItems((current) => [...current, ...nextItems]);
     setErrorMessage(errors.length ? errors.join(" ") : null);
+    uploading.current = false;
+  }
+
+  function loadSamples() {
+    const samples = [sampleReceipt("Sample cafe", "12.50", "12.50"), sampleReceipt("Sample stationery", "28.00", "23.00")];
+    setItems((current) => [...current, ...samples]);
   }
 
   function deleteItem(id: string) {
@@ -746,20 +768,10 @@ export default function Home() {
     setPreviewItemId(id);
   }
 
-  function setProgressSimulation(id: string) {
-    clearInterval(progressTimers.current[id]);
-    progressTimers.current[id] = setInterval(() => {
-      updateItem(id, (item) => {
-        if (item.status !== "extracting") return item;
-        const nextProgress = item.progress < 70 ? item.progress + 7 : Math.min(90, item.progress + 2);
-        return { ...item, progress: nextProgress };
-      });
-    }, 350);
-  }
-
   async function extractSingleItem(id: string) {
-    const item = items.find((candidate) => candidate.id === id);
-    if (!item || !extractableStatuses.includes(item.status)) return;
+    const item = itemsRef.current.find((candidate) => candidate.id === id);
+    if (!item || extracting.current || !extractableStatuses.includes(item.status)) return;
+    extracting.current = true;
 
     updateItem(id, (current) => ({
       ...current,
@@ -770,7 +782,7 @@ export default function Home() {
       isNewResult: false,
       resultSeen: false
     }));
-    setProgressSimulation(id);
+
 
     try {
       const body = new FormData();
@@ -795,6 +807,11 @@ export default function Home() {
         status: complete ? "extracted" : "needs-review",
         progress: 100,
         extraction: payload.data ?? null,
+        savedValues: formValues,
+        reviewedAt: undefined,
+        extractedAt: payload.extractedAt ?? new Date().toISOString(),
+        requestId: payload.requestId,
+        editedAt: Date.now(),
         formValues,
         errors,
         errorMessage: null,
@@ -811,22 +828,29 @@ export default function Home() {
         resultSeen: false
       }));
     } finally {
+      extracting.current = false;
       clearInterval(progressTimers.current[id]);
       delete progressTimers.current[id];
     }
   }
 
   async function extractSelected() {
+    if (busy) return;
+    setBusy(true);
+    stopRequested.current = false;
     const targets = items.filter((item) => item.selected && extractableStatuses.includes(item.status));
 
     for (const item of targets) {
+      if (stopRequested.current) break;
       await extractSingleItem(item.id);
     }
+    setBusy(false);
   }
 
   function updateField(id: string, field: keyof ReceiptFormValues, value: string) {
     updateItem(id, (item) => ({
       ...item,
+      editedAt: Date.now(),
       formValues: { ...item.formValues, [field]: value },
       errors: { ...item.errors, [field]: undefined }
     }));
@@ -836,17 +860,10 @@ export default function Home() {
     markResultSeen(id);
     updateItem(id, (item) => {
       const errors = validateReceiptForm(item.formValues);
-      const extraction = formValuesToExtraction(item.formValues, item.extraction);
-      const complete = Object.keys(errors).length === 0 && isExtractionComplete(extraction);
+      if (Object.keys(errors).length) return { ...item, errors };
+      return { ...item, savedValues: { ...item.formValues }, reviewedAt: undefined,
+        editedAt: Date.now(), errors, status: "needs-review" };
 
-      return {
-        ...item,
-        errors,
-        extraction,
-        status: complete ? "edited" : "needs-review",
-        isNewResult: complete,
-        resultSeen: !complete
-      };
     });
   }
 
@@ -859,13 +876,30 @@ export default function Home() {
   function downloadSelected() {
     const payload = completeSelectedItems.map(buildDownloadPayload).filter(Boolean);
     if (!payload.length) return;
-    downloadJson("receipt-extractions.json", payload);
+    const csv = expensesCsv(completeSelectedItems.map((item) => ({ id: item.id, source: item.file.name, values: item.savedValues!, reviewedAt: item.reviewedAt! })));
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a"); link.href = url; link.download = "expenses.csv"; link.click(); URL.revokeObjectURL(url);
   }
 
   return (
     <>
       <AppHeader />
-      <PersistentHero />
+      <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
+        <h1 className="text-2xl font-bold">Turn receipts into expense records</h1>
+        <p>JPG, PNG or WebP · 5 MB each · up to five receipts. Live extraction sends images to the AI provider. Work is saved on this device for seven days after editing. Browser storage is a convenience and may be cleared by your browser.</p>
+        <button disabled={!hydrated || busy || items.length > 3} onClick={loadSamples}>Try two sample receipts</button>{" · "}
+        <button disabled={!hydrated || busy} onClick={() => { storageReady.current = true; setItems([]); }}>Delete batch / Clear saved data</button>
+        {busy && <button onClick={() => { stopRequested.current = true; }}>Stop remaining work</button>}
+        <p aria-live="polite">Eligible exports {completeSelectedItems.length}. {items.filter((item) => item.extraction).length} of {items.length} extracted.</p>
+        {selectedItems.filter((item) => !isCompleteItem(item)).map((item) => <p key={item.id}>{item.file.name} excluded — {item.extraction && JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "save or discard changes" : "extract, correct errors and mark reviewed"}.</p>)}
+        {items.filter((item) => item.extraction).map((item) => <div key={item.id} className="flex flex-wrap gap-3">
+          <span>{item.file.name} · model confidence {item.extraction?.confidence} · {isCompleteItem(item) ? "Reviewed" : "Review required"}</span>
+          <button onClick={() => updateItem(item.id, (current) => ({ ...current, formValues: { ...(current.savedValues ?? current.formValues) }, errors: {} }))}>Discard changes</button>
+          <button disabled={JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)} onClick={() => updateItem(item.id, (current) => { const errors = validateReceiptForm(current.formValues); return { ...current, errors, reviewedAt: Object.keys(errors).length ? undefined : new Date().toISOString(), editedAt: Date.now() }; })}>Mark reviewed</button>
+        </div>)}
+        <button disabled={!completeSelectedItems.length} onClick={downloadSelected}>Export expenses CSV ({completeSelectedItems.length})</button>{" · "}
+        <button disabled={!completeSelectedItems.length} onClick={() => downloadJson("expenses.json", completeSelectedItems.map(buildDownloadPayload))}>Export JSON</button>
+      </section>
       <main className="min-h-[calc(100vh-151px)] px-4 pb-28 pt-5 sm:px-6 lg:px-8">
         {items.length === 0 ? (
           <div className="flex min-h-[calc(100vh-18rem)] flex-col items-center justify-center gap-4">
@@ -874,7 +908,7 @@ export default function Home() {
                 {errorMessage}
               </div>
             ) : null}
-            <UploadDropzone canAddMore={canAddMore} onFiles={handleFiles} />
+            <UploadDropzone canAddMore={canAddMore && hydrated && !busy} onFiles={handleFiles} />
           </div>
         ) : (
           <section className="mx-auto max-w-5xl">
@@ -908,8 +942,8 @@ export default function Home() {
           <FloatingBatchFooter
             fileCount={items.length}
             selectedCount={selectedItems.length}
-            canAddMore={canAddMore}
-            canExtractSelected={selectedExtractableItems.length > 0}
+            canAddMore={canAddMore && hydrated && !busy}
+            canExtractSelected={!busy && selectedExtractableItems.length > 0}
             extractCount={selectedExtractableItems.length}
             canDownloadSelected={completeSelectedItems.length > 0}
             onSelectToggle={() => {

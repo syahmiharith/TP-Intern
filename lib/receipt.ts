@@ -113,16 +113,13 @@ export function validateReceiptForm(values: ReceiptFormValues) {
     errors.merchantName = "Merchant name is required.";
   }
 
-  if (!values.receiptType) {
-    errors.receiptType = "Receipt type is required.";
-  }
 
-  if (!values.date.trim()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date) || !Number.isFinite(Date.parse(values.date)) || new Date(values.date).toISOString().slice(0, 10) !== values.date) {
     errors.date = "Date is required.";
   }
 
   const amount = Number(values.totalAmount);
-  if (!values.totalAmount.trim() || Number.isNaN(amount) || amount <= 0) {
+  if (!values.totalAmount.trim() || !Number.isFinite(amount) || !/^\d+(\.\d+)?$/.test(values.totalAmount) || amount <= 0) {
     errors.totalAmount = "Total amount must be a number greater than 0.";
   }
 
@@ -132,6 +129,10 @@ export function validateReceiptForm(values: ReceiptFormValues) {
     errors.currency = "Use a 3-letter currency code, for example MYR, USD, or KRW.";
   }
 
+  const currency = values.currency.trim().toUpperCase();
+  if (!Intl.supportedValuesOf("currency").includes(currency)) errors.currency = "Choose a recognized currency code.";
+  const digits = new Intl.NumberFormat("en", { style: "currency", currency: /^[A-Z]{3}$/.test(currency) ? currency : "USD" }).resolvedOptions().maximumFractionDigits ?? 2;
+  if ((values.totalAmount.split(".")[1]?.length ?? 0) > digits) errors.totalAmount = "Too many decimal places for this currency.";
   return errors;
 }
 
@@ -159,7 +160,7 @@ export function formValuesToExtraction(
     date: values.date.trim() || null,
     totalAmount: values.totalAmount.trim() ? Number(values.totalAmount) : null,
     currency: values.currency.trim() ? values.currency.trim().toUpperCase() : null,
-    confidence: existing?.confidence === "low" ? "medium" : existing?.confidence ?? "medium",
+    confidence: existing?.confidence ?? "low",
     notes: values.notes
       .split("\n")
       .map((note) => note.trim())

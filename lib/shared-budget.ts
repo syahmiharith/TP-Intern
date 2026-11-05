@@ -1,7 +1,7 @@
 /** Atomic reservation across server instances using a Redis REST endpoint. */
 export async function reserveProviderCall(request: Request): Promise<Response | null> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   if (!url || !token) {
     if (process.env.NODE_ENV !== "production") return null;
     return Response.json({ code: "RATE_LIMITED", error: "Live extraction is temporarily unavailable. Try sample receipts." }, { status: 503 });

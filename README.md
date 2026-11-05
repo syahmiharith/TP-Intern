@@ -300,7 +300,7 @@ Try two synthetic receipts without a provider call. Correct the stationery recei
 
 Images, pending edits, saved revisions and review status are stored in IndexedDB on this device, expiring seven days after editing. Browser storage can be evicted. Delete batch clears stored work. Interrupted extraction requires a manual retry. Expanded item editing and item CSV are deferred pending pilot evidence.
 
-Production live extraction requires `GEMINI_API_KEY`, `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The Redis REST service must support EVAL. Reservations enforce 15 requests per IP per UTC minute and a global UTC daily budget, configured with `PROVIDER_DAILY_BUDGET` (default 100). Missing or unavailable budget storage blocks live extraction while samples remain available. Use the deployment platform's trusted proxy headers for client IPs.
+Production live extraction requires `GEMINI_API_KEY` and Redis REST credentials. The Vercel Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically. Explicit `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` values take precedence. The Redis REST service must support EVAL. Reservations enforce 15 requests per IP per UTC minute and a global UTC daily budget, configured with `PROVIDER_DAILY_BUDGET` (default 100). Missing or unavailable budget storage blocks live extraction while samples remain available. Use the deployment platform's trusted proxy headers for client IPs.
 
 Release verification requires the automated checks, deployed sample correction and CSV download, and a separate synthetic real-provider receipt. Roll back the deployment if exports differ from reviewed values or storage recovery loses edits. Never log receipt contents.
 

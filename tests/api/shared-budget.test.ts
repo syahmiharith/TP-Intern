@@ -4,7 +4,20 @@ afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 it("fails closed in production without shared budget configuration", async () => {
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+  vi.stubEnv("KV_REST_API_URL", "");
   expect((await reserveProviderCall(new Request("http://localhost")))?.status).toBe(503);
+});
+it("uses Vercel integration-managed Redis credentials", async () => {
+  vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+  vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+  vi.stubEnv("KV_REST_API_URL", "https://integration.example.com");
+  vi.stubEnv("KV_REST_API_TOKEN", "integration-test");
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ result: 1 }) });
+  vi.stubGlobal("fetch", fetch);
+  expect(await reserveProviderCall(new Request("http://localhost"))).toBeNull();
+  expect(fetch).toHaveBeenCalledWith("https://integration.example.com", expect.objectContaining({
+    headers: { Authorization: "Bearer integration-test", "Content-Type": "application/json" }
+  }));
 });
 it("atomically reserves the shared budget and returns retry guidance", async () => {
   vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.com");

@@ -1,7 +1,7 @@
 import { ReceiptExtraction, ExtractionErrorCode, receiptExtractionSchema } from "@/lib/receipt";
 import { normalizeReceiptExtraction } from "@/lib/receipt-normalizer";
 
-const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
+const GEMINI_REQUEST_TIMEOUT_MS = 15_000;
 
 const EXTRACTION_PROMPT = `You are a careful receipt data extraction assistant.
 
@@ -119,17 +119,34 @@ function buildNeedsReviewFallback(note: string): ReceiptExtraction {
   });
 }
 
-export async function extractReceiptFromImage({
-  file,
-  apiKey,
-  model,
-  timeoutMs
-}: {
+type ExtractReceiptOptions = {
   file: File;
   apiKey: string;
   model: string;
   timeoutMs?: number;
-}): Promise<ReceiptExtraction> {
+  beforeRetry?: () => Promise<void>;
+};
+
+export async function extractReceiptFromImage(options: ExtractReceiptOptions): Promise<ReceiptExtraction> {
+  const attemptOptions = { ...options, timeoutMs: options.timeoutMs ?? 15_000 };
+  try {
+    return await extractReceiptAttempt(attemptOptions);
+  } catch (error) {
+    if (!(error instanceof ReceiptExtractionError) || error.code !== "AI_PROVIDER_ERROR" ||
+        ![500, 502, 503, 504].includes(error.status)) {
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await options.beforeRetry?.();
+    console.info("[receipt-extraction] retrying transient provider failure", {
+      status: error.status,
+      providerStatus: error.providerStatus
+    });
+    return extractReceiptAttempt(attemptOptions);
+  }
+}
+
+async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: ExtractReceiptOptions): Promise<ReceiptExtraction> {
   const arrayBuffer = await file.arrayBuffer();
   const base64Image = Buffer.from(arrayBuffer).toString("base64");
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;

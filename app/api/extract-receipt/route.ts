@@ -9,6 +9,7 @@ import {
 import { checkReceiptExtractionRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+export const preferredRegion = "iad1";
 
 type ErrorBody = {
   code: ExtractionErrorCode;
@@ -83,7 +84,14 @@ async function extract(request: Request, requestId: string) {
     const extraction = await extractReceiptFromImage({
       file: receiptFile,
       apiKey,
-      model
+      model,
+      beforeRetry: async () => {
+        const limit = await reserveProviderCall(request);
+        if (limit) {
+          const body = await limit.json() as { error: string };
+          throw new ReceiptExtractionError("RATE_LIMITED", body.error, limit.status);
+        }
+      }
     });
 
     console.info("[receipt-extraction] ai call succeeded");
@@ -95,7 +103,9 @@ async function extract(request: Request, requestId: string) {
       console.warn("[receipt-extraction] extraction failed", {
         requestId, code: error.code, status: error.status, providerStatus: error.providerStatus
       });
-      return errorResponse(error.code, error.message, error.status);
+      const response = errorResponse(error.code, error.message, error.status);
+      if (error.code === "RATE_LIMITED" && error.status === 429) response.headers.set("Retry-After", "60");
+      return response;
     }
 
     console.error("[receipt-extraction] unexpected failure", { code: "UNKNOWN_ERROR" });

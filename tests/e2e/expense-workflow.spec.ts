@@ -8,12 +8,16 @@ test("reviewed corrections survive refresh and CSV uses current reviewed values"
   await page.getByRole("button", { name: "Mark reviewed", exact: true }).nth(1).click();
   const total = page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1);
   await total.fill("28.00");
+  await expect(page.locator("article").nth(1).getByText("Unsaved changes", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export expenses CSV (0)", exact: true })).toBeDisabled();
   await page.waitForTimeout(300);
   await page.reload();
   await expect(page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1)).toHaveValue("28.00");
   await page.getByRole("button", { name: "Save changes", exact: true }).nth(1).click();
   await page.getByRole("button", { name: "Mark reviewed", exact: true }).nth(1).click();
+  const reviewedRow = page.locator("article").nth(1);
+  await expect(reviewedRow.getByText("Reviewed", { exact: true })).toBeVisible();
+  await expect(reviewedRow.getByRole("heading", { name: "Review Required", exact: true })).toBeHidden();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export expenses CSV (1)", exact: true }).click();
   const file = await download;

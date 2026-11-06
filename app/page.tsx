@@ -92,6 +92,8 @@ function formatSummary(item: ReceiptQueueItem) {
 }
 
 function statusLabel(item: ReceiptQueueItem) {
+  if (isCompleteItem(item)) return "Reviewed";
+  if (item.extraction && JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)) return "Unsaved changes";
   if (item.status === "extracted" && item.extraction) return `Extracted · ${item.extraction.confidence}`;
   if (item.status === "needs-review") return "Needs review";
   return item.status[0].toUpperCase() + item.status.slice(1);
@@ -312,7 +314,7 @@ function ExpandedReceiptDetails({
   onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
   onSave: (id: string) => void;
 }) {
-  const reviewRequired = item.status === "needs-review";
+  const reviewRequired = !isCompleteItem(item);
   const [showImage, setShowImage] = useState(false);
 
   useEffect(() => {
@@ -323,7 +325,7 @@ function ExpandedReceiptDetails({
     <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2.5">
       <button className="lg:hidden" aria-pressed={showImage} onClick={() => setShowImage((value) => !value)}>{showImage ? "Show form" : "Show receipt image"}</button>
       <h3 className="text-sm font-bold text-slate-950">{reviewRequired ? "Review Required" : "Receipt Details"}</h3>
-      {reviewRequired ? (
+      {reviewRequired && (item.extraction?.confidence === "low" || Object.keys(item.errors).length > 0) ? (
         <p className="mt-0.5 text-xs text-slate-600">Some fields could not be extracted confidently. Please check manually.</p>
       ) : null}
 

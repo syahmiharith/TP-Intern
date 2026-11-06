@@ -59,12 +59,14 @@ type GeminiResponse = {
   }>;
   error?: {
     message?: string;
+    status?: string;
   };
 };
 
 export class ReceiptExtractionError extends Error {
   code: ExtractionErrorCode;
   status: number;
+  providerStatus?: string;
 
   constructor(code: ExtractionErrorCode, message: string, status: number) {
     super(message);
@@ -117,20 +119,37 @@ function buildNeedsReviewFallback(note: string): ReceiptExtraction {
   });
 }
 
-export async function extractReceiptFromImage({
-  file,
-  apiKey,
-  model,
-  timeoutMs
-}: {
+type ExtractReceiptOptions = {
   file: File;
   apiKey: string;
   model: string;
   timeoutMs?: number;
-}): Promise<ReceiptExtraction> {
+  beforeRetry?: () => Promise<void>;
+};
+
+export async function extractReceiptFromImage(options: ExtractReceiptOptions): Promise<ReceiptExtraction> {
+  const attemptOptions = { ...options, timeoutMs: options.timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS };
+  try {
+    return await extractReceiptAttempt(attemptOptions);
+  } catch (error) {
+    if (!(error instanceof ReceiptExtractionError) || error.code !== "AI_PROVIDER_ERROR" ||
+        ![500, 502, 503, 504].includes(error.status)) {
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await options.beforeRetry?.();
+    console.info("[receipt-extraction] retrying transient provider failure", {
+      status: error.status,
+      providerStatus: error.providerStatus
+    });
+    return extractReceiptAttempt({ ...attemptOptions, timeoutMs: Math.min(attemptOptions.timeoutMs, 10_000) });
+  }
+}
+
+async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: ExtractReceiptOptions): Promise<ReceiptExtraction> {
   const arrayBuffer = await file.arrayBuffer();
   const base64Image = Buffer.from(arrayBuffer).toString("base64");
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS);
 
@@ -140,7 +159,8 @@ export async function extractReceiptFromImage({
     geminiResponse = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -177,11 +197,16 @@ export async function extractReceiptFromImage({
   const geminiJson = (await geminiResponse.json()) as GeminiResponse;
 
   if (!geminiResponse.ok) {
-    throw new ReceiptExtractionError(
+    const error = new ReceiptExtractionError(
       "AI_PROVIDER_ERROR",
       getGeminiPublicErrorMessage(geminiResponse.status, geminiJson.error?.message),
       geminiResponse.status
     );
+    const providerStatus = geminiJson.error?.status;
+    if (providerStatus && /^[A-Z_]{1,64}$/.test(providerStatus)) {
+      error.providerStatus = providerStatus;
+    }
+    throw error;
   }
 
   const modelText = geminiJson.candidates?.[0]?.content?.parts

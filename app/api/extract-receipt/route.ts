@@ -1,3 +1,5 @@
+import { reserveProviderCall } from "@/lib/shared-budget";
+import { validateReceiptForm, extractionToFormValues } from "@/lib/receipt";
 import { extractReceiptFromImage, ReceiptExtractionError } from "@/lib/ai/extract-receipt";
 import {
   ExtractionErrorCode,
@@ -37,7 +39,7 @@ function validateReceiptFile(receipt: unknown) {
   return null;
 }
 
-export async function POST(request: Request) {
+async function extract(request: Request, requestId: string) {
   console.info("[receipt-extraction] request received");
 
   try {
@@ -68,32 +70,57 @@ export async function POST(request: Request) {
       return validationError;
     }
 
+    const sharedLimit = await reserveProviderCall(request);
+    if (sharedLimit) return sharedLimit;
     const receiptFile = receipt as File;
 
     console.info("[receipt-extraction] file validation passed");
-    console.info("[receipt-extraction] ai call started");
+    console.info("[receipt-extraction] ai call started", {
+      requestId,
+      model: /^gemini-[a-zA-Z0-9._-]+$/.test(model) ? model : "unrecognized-model-setting"
+    });
 
     const extraction = await extractReceiptFromImage({
       file: receiptFile,
       apiKey,
-      model
+      model,
+      beforeRetry: async () => {
+        const limit = await reserveProviderCall(request);
+        if (limit) {
+          const body = await limit.json() as { error: string };
+          throw new ReceiptExtractionError("RATE_LIMITED", body.error, limit.status);
+        }
+      }
     });
 
     console.info("[receipt-extraction] ai call succeeded");
     console.info("[receipt-extraction] schema validation passed");
 
-    return jsonResponse({ data: extraction });
+    return jsonResponse({ data: extraction, requestId, extractedAt: new Date().toISOString(), warnings: Object.entries(validateReceiptForm(extractionToFormValues(extraction))).map(([field, message]) => ({ field, message })) });
   } catch (error) {
     if (error instanceof ReceiptExtractionError) {
-      console.warn("[receipt-extraction] extraction failed", { code: error.code, status: error.status });
-      return errorResponse(error.code, error.message, error.status);
+      console.warn("[receipt-extraction] extraction failed", {
+        requestId, code: error.code, status: error.status, providerStatus: error.providerStatus
+      });
+      const response = errorResponse(error.code, error.message, error.status);
+      if (error.code === "RATE_LIMITED" && error.status === 429) response.headers.set("Retry-After", "60");
+      return response;
     }
 
-    console.error("[receipt-extraction] unexpected failure", error);
+    console.error("[receipt-extraction] unexpected failure", { code: "UNKNOWN_ERROR" });
     return errorResponse(
       "UNKNOWN_ERROR",
       "Receipt extraction failed. Please try again with a clearer image.",
       500
     );
   }
+}
+
+export async function POST(request: Request) {
+  const requestId = crypto.randomUUID();
+  const startedAt = Date.now();
+  const response = await extract(request, requestId);
+  response.headers.set("X-Request-ID", requestId);
+  console.info("[receipt-extraction] completed", { requestId, durationMs: Date.now() - startedAt, status: response.status });
+  return response;
 }

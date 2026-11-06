@@ -119,25 +119,26 @@ export async function typeTextInput(locator: Locator, value: string) {
 export async function gotoHome(page: Page) {
   await page.goto("/");
   await expect(page.getByText("Upload receipt files")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled();
 }
 
 export async function uploadReceipt(page: Page, file = defaultReceiptFile) {
   await page.locator('input[type="file"]').first().setInputFiles(file);
 
   if (["image/jpeg", "image/png", "image/webp"].includes(file.mimeType) && file.buffer.length <= 5 * 1024 * 1024) {
-    await expect(page.getByText(file.name)).toBeVisible();
+    await expect(page.getByText(file.name, { exact: true })).toBeVisible();
   }
 }
 
 export async function uploadReceipts(page: Page, files = [defaultReceiptFile]) {
   await page.locator('input[type="file"]').first().setInputFiles(files);
   for (const file of files) {
-    await expect(page.getByText(file.name)).toBeVisible();
+    await expect(page.getByText(file.name, { exact: true })).toBeVisible();
   }
 }
 
 export async function expectReceiptQueued(page: Page, fileName: string) {
-  await expect(page.getByText(fileName)).toBeVisible();
+  await expect(page.getByText(fileName, { exact: true })).toBeVisible();
   await expect(page.getByText(/Waiting for extraction/i)).toBeVisible();
 }
 
@@ -179,7 +180,7 @@ export async function runMockedExtraction(page: Page, extraction = highConfidenc
 
 export async function expandCurrentReceipt(page: Page, fileName = defaultReceiptFile.name) {
   await expandButton(page, fileName).click();
-  await expect(page.getByText(/Receipt Details|Review Required/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Receipt Details|Review Required/i })).toBeVisible();
 }
 
 export async function expectFormValues(
@@ -245,4 +246,22 @@ export async function createGeneratedReceiptPng(page: Page) {
     mimeType: "image/png",
     buffer: Buffer.from(base64, "base64")
   };
+}
+
+export async function storedImageCount(page: Page) {
+  return page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const open = indexedDB.open("receipt-expenses");
+    open.onsuccess = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains("images")) {
+        db.close(); reject(new Error("Saved image store is unavailable")); return;
+      }
+      const transaction = db.transaction("images", "readonly");
+      const count = transaction.objectStore("images").count();
+      count.onsuccess = () => resolve(count.result);
+      count.onerror = () => reject(count.error);
+      transaction.oncomplete = () => db.close();
+    };
+    open.onerror = () => reject(open.error);
+  }));
 }

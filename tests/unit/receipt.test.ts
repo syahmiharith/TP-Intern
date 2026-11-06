@@ -207,7 +207,7 @@ describe("completion and form conversion", () => {
       receiptType: "Food & Beverage",
       totalAmount: 12.5,
       currency: "MYR",
-      confidence: "medium",
+      confidence: "low",
       notes: ["Reviewed by user."]
     });
   });
@@ -248,11 +248,11 @@ describe("validateReceiptForm", () => {
     expect(validateReceiptForm(validForm())).toEqual({});
   });
 
-  it("requires merchant name and receipt type", () => {
+  it("requires merchant name and permits category fallback", () => {
     const errors = validateReceiptForm(validForm({ merchantName: "   ", receiptType: "" }));
 
     expect(errors.merchantName).toBe("Merchant name is required.");
-    expect(errors.receiptType).toBe("Receipt type is required.");
+    expect(errors.receiptType).toBeUndefined();
   });
 
   it("requires date", () => {

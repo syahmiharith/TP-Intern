@@ -293,3 +293,28 @@ http://localhost:3000
 ## Project Origin
 
 Originally developed as a recruitment assessment, this repository is presented as a portfolio project. It is not a production client system or a claim of employment. The original development history and MIT license are preserved.
+
+## Expense review release
+
+Try two synthetic receipts without a provider call. Correct the stationery receipt against its image, save the change, mark it reviewed, and export expenses CSV. Editing a reviewed receipt blocks its export until it is saved and reviewed again. Discard restores the saved revision and its review status. Original model confidence remains separate from human review.
+
+Images, pending edits, saved revisions and review status are stored in IndexedDB on this device, expiring seven days after editing. Browser storage can be evicted. Delete batch clears stored work. Interrupted extraction requires a manual retry. Expanded item editing and item CSV are deferred pending pilot evidence.
+
+Production live extraction requires `GEMINI_API_KEY` and Redis REST credentials. The Vercel Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically. Explicit `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` values take precedence. The Redis REST service must support EVAL. Reservations enforce 15 requests per IP per UTC minute and a global UTC daily budget, configured with `PROVIDER_DAILY_BUDGET` (default 100). Missing or unavailable budget storage blocks live extraction while samples remain available. Use the deployment platform's trusted proxy headers for client IPs.
+
+Release verification requires the automated checks, deployed sample correction and CSV download, and a separate synthetic real-provider receipt. Roll back the deployment if exports differ from reviewed values or storage recovery loses edits. Never log receipt contents.
+
+Pilot evidence is pending. Observe five expense preparers processing three synthetic receipts and opening the CSV in their usual spreadsheet. Record unaided completion counts, errors, time versus manual entry and cleanup. Retest shipped improvements with affected participants and record voluntary return use separately. No participant results are claimed by this release.
+
+Transient provider failures (HTTP 500/502/503/504) get one retry after a short backoff, preserving the initial 45-second timeout and limiting the retry to 10 seconds. Every attempt reserves shared budget before calling Gemini. Quota and credential failures return immediately. Model name, structured provider status and request ID support diagnosis without receipt content or keys in logs.
+
+Pin `GEMINI_MODEL=gemini-2.5-flash` for this release. Live preview verification succeeded with this model after the movable latest alias and tested newer models returned UNAVAILABLE. The live Playwright scenario now checks extraction, reviewed CSV/JSON values, original confidence, source identity and review recovery after refresh.
+
+
+## Runtime verification coverage
+
+Runtime checks cover notes and formula-safe CSV/JSON round trips, keyboard preview focus, interrupted extraction, stop/resume, duplicate files, the five-receipt limit, storage quota failure, unsupported saved records, currency minor units, and legacy saved-data migration. CI runs the expense and runtime recovery checks in mobile WebKit as well as Chromium.
+
+Saved records now use schema version 2 with image bytes in a separate IndexedDB image store. This supports WebKit runtimes that reject persisted Blob/File objects and avoids rewriting image bytes for each field correction. Existing schema-1 records migrate with corrections, review status and source identity retained. Images and queue metadata are committed together, and removed or expired receipts release their stored images.
+
+Deployed browser automation uses Vercel’s `x-vercel-skip-toolbar` header so preview feedback widgets cannot obscure product controls. Live-provider verification records an initial 503 and exercises one explicit user retry when needed. Run live-provider scenarios sequentially to conserve the shared provider allowance.

@@ -30,7 +30,8 @@ test.describe("receipt review and validation", () => {
     await fillReviewFields(page);
     await saveChanges(page);
 
-    await expect(page.getByText(/Edited/i)).toBeVisible();
+    await expect(page.getByText(/Review required/i).first()).toBeVisible();
+    await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
     await expect(page.getByRole("button", { name: /Download result for sample-receipt.png/i })).toBeVisible();
   });
 
@@ -54,7 +55,7 @@ test.describe("receipt review and validation", () => {
     await saveChanges(page);
 
     await expect(page.getByText("Merchant name is required.")).toBeHidden();
-    await expect(page.getByText(/Edited/i)).toBeVisible();
+    await expect(page.getByText(/Review required/i).first()).toBeVisible();
   });
 
   test("rejects invalid amount and currency before accepting corrected values", async ({ page }) => {
@@ -71,12 +72,12 @@ test.describe("receipt review and validation", () => {
     await saveChanges(page);
 
     await expect(page.getByText("Total amount must be a number greater than 0.")).toBeVisible();
-    await expect(page.getByText(/Use a 3-letter currency code/i)).toBeVisible();
+    await expect(page.getByText(/Choose a recognized currency code/i)).toBeVisible();
 
     await totalAmountInput(page).fill("10.90");
     await typeTextInput(currencyInput(page), "USD");
     await saveChanges(page);
 
-    await expect(page.getByText(/Edited/i)).toBeVisible();
+    await expect(page.getByText(/Review required/i).first()).toBeVisible();
   });
 });

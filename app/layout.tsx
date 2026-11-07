@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://receipt-to-form-syahmiharith.vercel.app"),
   alternates: { canonical: "/" },
   title: "Receipt-to-Form",
-  description: "AI-assisted receipt extraction with editable human review and reviewed expense CSV export."
+  description: "Turn receipts into expenses you can review, correct, and export to your spreadsheet."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

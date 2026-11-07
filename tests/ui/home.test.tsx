@@ -71,7 +71,7 @@ describe("Home page receipt queue", () => {
     expect(screen.getByText("Upload receipts")).toBeInTheDocument();
     expect(screen.getByText(/JPG, PNG or WEBP/i)).toBeInTheDocument();
     expect(screen.getByText("Receipt-to-Form")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Turn receipts into expense records/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Receipts in. Expenses ready./i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Extract/i })).not.toBeInTheDocument();
   });
 
@@ -89,7 +89,7 @@ describe("Home page receipt queue", () => {
 
     await uploadFiles([createImageFile("receipt-1.png"), createImageFile("receipt-2.png")]);
 
-    expect(screen.getByRole("heading", { name: /Turn receipts into expense records/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Receipts in. Expenses ready./i })).toBeInTheDocument();
     expect(screen.getByText("receipt-1.png")).toBeInTheDocument();
     expect(screen.getByText("receipt-2.png")).toBeInTheDocument();
     expect(screen.getByText(/2 selected/i)).toBeInTheDocument();

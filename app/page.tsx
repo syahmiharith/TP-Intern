@@ -219,6 +219,7 @@ function UploadDropzone({
           </>
         ) : null}
       </label>
+      {!compact && <p className="mt-3 text-center text-xs text-slate-500">Uploads are sent to an external AI service.</p>}
     </section>
   );
 }
@@ -619,11 +620,11 @@ function ReceiptQueueItemRow({
       {item.expanded && item.extraction ? <ExpandedReceiptDetails item={item} onFieldChange={onFieldChange} /> : null}
 
       {(item.status === "failed" || (!item.extraction && item.selected)) && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-sm">
-        {item.selected && <p className="text-slate-600">{item.status === "failed" ? "Not exported. Retry extraction to continue." : item.status === "extracting" ? "Not exported while reading." : "Not exported until extracted and reviewed."}</p>}
+        {item.selected && <p className="text-slate-600">{item.status === "failed" ? "Retry this receipt to continue." : item.status === "extracting" ? "Review before exporting." : "Extract and review to export."}</p>}
         {item.status === "failed" && <button disabled={busy} onClick={() => onRetry(item.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40"><RotateCcw className="h-4 w-4" aria-hidden="true" />Retry</button>}
       </div>}
       {item.extraction && !complete && <div className="space-y-2 border-t border-slate-200 px-4 py-3 text-sm">
-        {item.selected && <p className="text-slate-600">{hasErrors ? "Not exported. Correct the highlighted fields." : dirty ? "Not exported. Save changes, then mark reviewed." : "Not exported until reviewed."}</p>}
+        {item.selected && <p className="text-slate-600">{hasErrors ? "Complete the highlighted fields to export." : dirty ? "Save your changes, then mark reviewed." : "Review to include in your export."}</p>}
         <div className="flex flex-wrap gap-2 [&_button]:min-h-11 [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-blue-500 [&_button:disabled]:opacity-40">
           {dirty && <>
             <button aria-label="Save changes" title="Save changes" className="inline-flex items-center gap-2 border border-slate-300 bg-white" onClick={() => onSave(item.id)}><Save className="h-4 w-4" aria-hidden="true" />Save changes</button>
@@ -860,7 +861,7 @@ export default function Home() {
   function loadSamples() {
     if (legacy || uploadInProgress.current || busy || itemsRef.current.length > maxFiles - 2) return;
     setQueueRun(null);
-    const samples = [sampleReceipt("Sample cafe", "12.50", "12.50"), sampleReceipt("Sample stationery", "28.00", "23.00")];
+    const samples = [sampleReceipt("Sample cafe", "12.50", "12.50", "Client meeting"), sampleReceipt("Sample stationery", "28.00", "23.00", "Office supplies")];
     setItems((current) => [...current, ...samples]);
   }
 
@@ -1040,8 +1041,8 @@ export default function Home() {
     <>
       <AppHeader />
       <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
-        <h1 className="text-2xl font-bold">Turn receipts into expense records</h1>
-        <p className="max-w-2xl text-slate-600">We use an external AI service to read your receipts.</p>
+        <h1 className="text-2xl font-bold">Receipts in. Expenses ready.</h1>
+        <p className="max-w-2xl text-slate-600">Extract the details, review your expenses, and export to your spreadsheet.</p>
 
         <div className="flex flex-wrap items-center gap-2">
         {items.length > 0 && <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}>Try samples</button>}

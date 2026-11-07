@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {gotoHome} from './support/receipt';
 test('provider name is only disclosed in opt-in privacy details',async({page})=>{
  await gotoHome(page);
- await expect(page.getByText('We use an external AI service to read your receipts.',{exact:true})).toBeVisible();
+ await expect(page.getByText('Uploads are sent to an external AI service.',{exact:true})).toBeVisible();
  const footer=page.getByRole('contentinfo');
  expect(await footer.evaluate(el=>el.getBoundingClientRect().top>=innerHeight)).toBe(true);
  await footer.scrollIntoViewIfNeeded();

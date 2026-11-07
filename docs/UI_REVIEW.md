@@ -21,3 +21,5 @@ Use an icon alone for a familiar utility with a clear local scope. Keep a visibl
 Avoid headings that repeat the surrounding receipt context, repeated confidence labels, decorative hover rings, permanent inactive extraction controls, and fake percentage progress. Extracted line items are optional read-only details. Save must never invalidate an unchanged reviewed revision. Pointer hover must not rewrite saved work.
 
 These choices preserve the existing app, receipt IDs, persistence schema, CSV columns, original extraction and API contract. Deterministic tests cover the states in `tests/e2e/workflow-ui.spec.ts` alongside the existing workflow, preview, upload, recovery and export suites. Device-width checks use 375px, 768px and 1280px; mobile browser evidence is emulation.
+
+Public copy leads with the expense-preparer outcome. The hero promises the workflow, contextual guidance names the next action, and the processing disclosure stays beside upload with provider/storage detail in the footer. Internal verification and pilot notes remain supporting evidence rather than the product's main pitch.

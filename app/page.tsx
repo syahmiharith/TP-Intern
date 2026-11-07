@@ -307,7 +307,11 @@ function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClos
           </div>
         </div>
         <div className="overflow-auto p-4">
-          <div ref={viewportRef} role="region" aria-label="Receipt image viewer" tabIndex={0} className="h-[50vh] max-h-[32rem] overflow-auto rounded-lg bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
+          <div ref={viewportRef} role="region" aria-label="Receipt image viewer" tabIndex={0} onKeyDown={(event) => {
+            const steps: Record<string, ScrollToOptions> = { ArrowLeft: { left: -40 }, ArrowRight: { left: 40 }, ArrowUp: { top: -40 }, ArrowDown: { top: 40 } };
+            const step = steps[event.key];
+            if (step) { event.preventDefault(); event.currentTarget.scrollBy(step); }
+          }} className="h-[50vh] max-h-[32rem] overflow-auto rounded-lg bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
             <div className="relative" style={{ width: Math.max(viewportSize.width, orientedWidth * fit * zoom), height: Math.max(viewportSize.height, orientedHeight * fit * zoom) }}>
               {/* eslint-disable-next-line @next/next/no-img-element -- Blob preview URLs cannot be optimized by next/image. */}
               <img src={item.previewUrl} onLoad={(event) => { setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); setImageState("ready"); }} onError={() => { setImageState("failed"); dialogRef.current?.querySelector<HTMLButtonElement>('[aria-label="Close preview"]')?.focus(); }} style={{ width: imageSize.width * fit * zoom, height: imageSize.height * fit * zoom, transform: `translate(-50%, -50%) rotate(${rotation}deg)` }} alt={`Preview of ${item.file.name}`} className={clsx("absolute left-1/2 top-1/2 max-w-none rounded object-contain", imageState !== "ready" && "invisible")} />

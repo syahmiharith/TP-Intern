@@ -24,7 +24,7 @@ test("reviewed corrections survive refresh and CSV uses current reviewed values"
   const csv = await readFile((await file.path())!, "utf8");
   expect(csv).toContain('"28.00"');
   expect(csv).toContain('"Sample stationery.png"');
-  await expect(page.getByText(/^Model confidence: low$/i)).toBeVisible();
+  await expect(page.getByText(/^Extraction confidence low$/i)).toBeVisible();
   await page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1).fill("30.00");
   await page.locator("article").nth(1).getByRole("button", { name: "Discard changes", exact: true }).click();
   await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();

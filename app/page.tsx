@@ -1,4 +1,5 @@
 "use client";
+import { CurrencyField } from "./components/currency-field";
 import { readBatch, writeBatch, expensesCsv, sampleReceipt } from "@/lib/expense-workflow";
 
 
@@ -390,27 +391,9 @@ function ExpandedReceiptDetails({
           </div>
 
           <div className="mt-2 grid gap-2 lg:grid-cols-3">
-            <EditableField item={item} field="currency" label="Currency" onFieldChange={onFieldChange} />
+            <CurrencyField id={`${item.id}-currency`} value={item.formValues.currency} error={item.errors.currency} onChange={(value) => onFieldChange(item.id, "currency", value)} />
             <EditableField item={item} field="totalAmount" label="Total Amount" type="number" onFieldChange={onFieldChange} />
             <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange} />
-          </div>
-
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <div>
-              <p className="text-sm text-slate-600">Model confidence: <span className="font-medium">{item.extraction?.confidence ?? "unknown"}</span></p>
-            </div>
-            {item.extraction?.notes.length && item.extraction.notes.join("\n") !== item.formValues.notes ? <div>
-              <p className="text-xs font-semibold text-slate-700">Original notes</p>
-              {item.extraction?.notes.length ? (
-                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
-                  {item.extraction.notes.map((note, index) => (
-                    <li key={`${note}-${index}`}>{note}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-1 text-sm text-slate-500">No notes.</p>
-              )}
-            </div> : null}
           </div>
 
           <div className="mt-3 space-y-1">
@@ -419,9 +402,18 @@ function ExpandedReceiptDetails({
               id={`${item.id}-notes`}
               value={item.formValues.notes}
               onChange={(event) => onFieldChange(item.id, "notes", event.target.value)}
-              rows={3}
+              rows={2}
+              placeholder="Add a note (optional)"
               className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1 text-xs text-slate-500">
+            <p title="The model’s confidence in its original extraction. Unchanged by your edits or review.">Extraction confidence <span className="font-semibold capitalize text-slate-700">{item.extraction?.confidence ?? "unavailable"}</span></p>
+            {Boolean(item.extraction?.notes.length) && <details className="max-w-full">
+              <summary className="cursor-pointer rounded pb-2 text-slate-600 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Extraction notes</summary>
+              <ul className="max-w-md list-disc space-y-1 pb-2 pl-4 text-slate-600">{item.extraction?.notes.map((note, index) => <li key={index}>{note}</li>)}</ul>
+            </details>}
           </div>
 
           {item.extraction?.items.length ? <details className="mt-3">
@@ -550,7 +542,7 @@ function ReceiptQueueItemRow({
   return (
     <article
       className={clsx(
-        "relative overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors duration-300",
+        "relative rounded-2xl border bg-white shadow-sm transition-colors duration-300",
         !complete && !hasLeftEdge && item.status !== "extracting" && "border-slate-200",
         item.status === "extracting" && "border-blue-200",
         complete && "border-emerald-200",
@@ -566,7 +558,7 @@ function ReceiptQueueItemRow({
         title={canShowProcessedActions ? (item.expanded ? "Collapse receipt details" : "Expand receipt details") : undefined}
         data-testid={`receipt-row-toggle-${item.file.name}`}
         className={clsx(
-          "relative min-h-[96px] px-3 py-4 pl-16",
+          "relative min-h-[96px] rounded-t-2xl px-3 py-3 pl-16",
           canShowProcessedActions && "cursor-pointer hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
         )}
       >
@@ -583,7 +575,7 @@ function ReceiptQueueItemRow({
         </button>
 
         <div className="min-w-0">
-          <div className="flex min-w-0 flex-col gap-2 pr-28 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pr-24">
             {canShowProcessedActions ? <button
               aria-label={`${item.expanded ? "Collapse" : "Expand"} ${item.file.name}`}
               aria-expanded={item.expanded}
@@ -591,7 +583,8 @@ function ReceiptQueueItemRow({
               onClick={() => onToggleExpanded(item.id)}
               className="inline-flex min-h-11 min-w-0 items-center gap-1 rounded text-left text-sm font-bold text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
             ><span className="truncate">{item.file.name}</span>{item.expanded ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}</button> : <p className="min-w-0 truncate text-sm font-bold text-slate-950" title={item.file.name}>{item.file.name}</p>}
-            <span className="text-xs font-semibold text-slate-500">{statusLabel(item)}</span>
+            <span data-testid="receipt-status" className={clsx("inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold leading-4",
+              complete ? "bg-emerald-100 text-emerald-800" : item.status === "failed" || hasErrors ? "bg-rose-100 text-rose-800" : dirty || item.extraction ? "bg-amber-100 text-amber-900" : "bg-blue-50 text-blue-800")}>{complete ? <Check className="h-3 w-3" aria-hidden="true" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />}{statusLabel(item)}</span>
             {canShowProcessedActions && !item.expanded && item.formValues.receiptType ? (
               <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                 {item.formValues.receiptType}
@@ -672,7 +665,7 @@ function FloatingBatchFooter({
   const hasMultipleFiles = fileCount > 1;
 
   return (
-    <div className="mx-auto mt-5 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm">
+    <div aria-label="Batch actions" className="mx-auto w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {hasMultipleFiles ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -1038,7 +1031,7 @@ export default function Home() {
   }
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       <AppHeader />
       <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
         <h1 className="text-2xl font-bold">Receipts in. Expenses ready.</h1>
@@ -1055,7 +1048,7 @@ export default function Home() {
         {removedToast && <p role="status" className="text-slate-600">{removedToast}</p>}
         {legacy && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3">You are recovering receipts saved at the old address. Finish reviewing and export them here. Saved work stays here until cleared or expired. <a className="underline font-semibold" href="https://receipt-to-form-syahmiharith.vercel.app/">Open the main app</a></div>}
       </section>
-      <main className="min-h-[calc(100vh-151px)] px-4 pb-28 pt-5 sm:px-6 lg:px-8">
+      <main className="flex flex-1 flex-col px-4 pb-4 pt-5 sm:px-6 lg:px-8">
         {items.length === 0 ? (
           <div className="flex min-h-[calc(100vh-18rem)] flex-col items-center justify-center gap-4">
             {errorMessage ? (
@@ -1097,7 +1090,7 @@ export default function Home() {
         )}
 
         {items.length > 0 ? (
-          <FloatingBatchFooter
+          <div className="mt-auto pt-6"><FloatingBatchFooter
             fileCount={items.length}
             busy={busy}
             selectedCount={selectedItems.length}
@@ -1115,7 +1108,7 @@ export default function Home() {
             eligibleCount={completeSelectedItems.length}
             onJson={() => downloadJson("expenses.json", completeSelectedItems.map(buildDownloadPayload))}
             onDownload={downloadSelected}
-          />
+          /></div>
         ) : null}
 
         {previewItem ? <ReceiptPreviewModal item={previewItem} onClose={closePreview} /> : null}
@@ -1123,6 +1116,6 @@ export default function Home() {
 
       </main>
       <ProductFooter />
-    </>
+    </div>
   );
 }

@@ -96,3 +96,55 @@ test('an unreadable image keeps an actionable preview and keyboard exit',async({
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Preview unreadable.png',exact:true})).toBeFocused();
 });
+
+for (const width of [375, 768, 1280]) {
+ test(`currency search, notes and footer placement at ${width}px`, async ({page}) => {
+  await page.setViewportSize({width,height:900});
+  await gotoHome(page);
+  await page.getByRole('button',{name:'Try samples',exact:true}).click();
+  const row=page.locator('article').first();
+  const currency=row.getByRole('combobox',{name:'Currency',exact:true});
+  await currency.click();
+  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option')).toHaveCount(await page.evaluate(()=>Intl.supportedValuesOf('currency').length));
+  await currency.fill('Malaysian');
+  await expect(row.getByRole('option',{name:'MYR Malaysian Ringgit'})).toBeVisible();
+  await currency.press('ArrowDown');
+  const active=await currency.getAttribute('aria-activedescendant');
+  expect(active).toContain('MYR');
+  await currency.press('Enter');
+  await expect(currency).toHaveValue('MYR');
+  await expect(row.getByRole('listbox')).toBeHidden();
+  await currency.click();
+  await currency.fill('yen');
+  await row.getByRole('option',{name:'JPY Japanese Yen'}).click();
+  await expect(currency).toHaveValue('JPY');
+  await currency.click();
+  await currency.fill('USD');
+  await currency.press('Enter');
+  const notes=row.getByLabel('Notes',{exact:true});
+  await notes.fill('');
+  await notes.pressSequentially('Lunch with client',{delay:10});
+  await expect(notes).toHaveValue('Lunch with client');
+  await expect(row.getByTestId('receipt-status')).toHaveText('Unsaved changes');
+  await expect(row.getByText('Extraction confidence high',{exact:true})).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{const open=indexedDB.open('receipt-expenses');open.onsuccess=()=>{const db=open.result;const tx=db.transaction('batches','readonly');const get=tx.objectStore('batches').get('current');get.onsuccess=()=>resolve(get.result.items[0].formValues.notes);tx.oncomplete=()=>db.close();};}))).toBe('Lunch with client');
+  await page.reload();
+  await expect(notes).toHaveValue('Lunch with client');
+  await row.getByRole('button',{name:'Save changes',exact:true}).click();
+  await row.getByRole('button',{name:'Mark reviewed',exact:true}).click();
+  await expect(row.getByTestId('receipt-status')).toHaveText('Reviewed');
+  const pending=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export expenses CSV (1)',exact:true}).click();
+  const csv=await readFile((await (await pending).path())!,'utf8');
+  expect(csv).toContain('"Lunch with client"');
+  expect(csv).toContain('"USD"');
+  const toolbar=page.getByLabel('Batch actions',{exact:true});
+  const footer=page.locator('footer');
+  await footer.scrollIntoViewIfNeeded();
+  const gap=await page.evaluate(()=>document.querySelector('footer')!.getBoundingClientRect().top-document.querySelector('[aria-label="Batch actions"]')!.getBoundingClientRect().bottom);
+  expect(gap).toBeGreaterThanOrEqual(12);
+  expect(gap).toBeLessThanOrEqual(24);
+  await expect(toolbar.getByRole('button',{name:'Export expenses CSV (1)',exact:true})).toBeInViewport();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ });
+}

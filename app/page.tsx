@@ -7,6 +7,9 @@ import { flushSync } from "react-dom";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   AlertCircle,
+  ArrowUpRight,
+  Code2,
+  MessageSquare,
   Save,
   FileText,
   RotateCcw,
@@ -688,6 +691,33 @@ function FloatingBatchFooter({
   );
 }
 
+const feedbackUrl = "https://github.com/syahmiharith/receipt-to-form/issues/new?" + new URLSearchParams({
+  title: "Receipt-to-Form feedback",
+  body: "Please use synthetic examples. Do not attach real receipts or personal information.\n\nWhat were you trying to do?\n\nWhat happened?\n\nWhat did you expect?\n\nDevice and browser (optional):\n"
+}).toString();
+
+function ProductFooter() {
+  const linkStyle = "inline-flex min-h-11 items-center gap-2 rounded text-sm text-slate-600 transition hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500";
+  return (
+    <footer className="border-t border-slate-200 bg-white/60 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">Built by <span className="font-medium text-slate-800">Zulsyahmi Zulkefli</span></p>
+          <nav aria-label="Project links" className="flex flex-wrap gap-x-6 gap-y-1">
+            <a className={linkStyle} href="https://portfolio-syahmiharith.vercel.app/" target="_blank" rel="noopener noreferrer" title="Open portfolio in a new tab"><ArrowUpRight className="h-4 w-4" aria-hidden="true" />More work<span className="sr-only"> (opens in a new tab)</span></a>
+            <a className={linkStyle} href="https://github.com/syahmiharith/receipt-to-form" target="_blank" rel="noopener noreferrer" title="View source on GitHub in a new tab"><Code2 className="h-4 w-4" aria-hidden="true" />Source code<span className="sr-only"> (opens in a new tab)</span></a>
+            <a className={linkStyle} href={feedbackUrl} target="_blank" rel="noopener noreferrer" title="Open a public GitHub issue form in a new tab"><MessageSquare className="h-4 w-4" aria-hidden="true" />Report a problem<span className="sr-only"> on GitHub (opens in a new tab)</span></a>
+          </nav>
+        </div>
+        <details className="max-w-2xl text-xs text-slate-600">
+          <summary className="w-fit cursor-pointer rounded py-1 underline-offset-4 hover:text-slate-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Privacy &amp; storage</summary>
+          <p className="pt-2 leading-relaxed">Live extraction uses Google Gemini. Samples stay in your browser without a provider request. Receipts and edits are saved in this browser for seven days after your last edit. Browser storage may be cleared; export anything you need to keep.</p>
+        </details>
+      </div>
+    </footer>
+  );
+}
+
 export default function Home() {
   const [items, setItems] = useState<ReceiptQueueItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -984,11 +1014,8 @@ export default function Home() {
       <AppHeader />
       <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
         <h1 className="text-2xl font-bold">Turn receipts into expense records</h1>
-        <p className="max-w-2xl text-slate-600">Receipt images are sent to an AI provider for extraction.</p>
-        <details className="max-w-2xl text-xs text-slate-500">
-          <summary className="w-fit cursor-pointer rounded py-1 underline-offset-4 hover:text-slate-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Privacy &amp; storage</summary>
-          <p className="pt-2 leading-relaxed">Live extraction uses Google Gemini. Samples stay in your browser without a provider request. Receipts and edits are saved in this browser for seven days after your last edit. Browser storage may be cleared; export anything you need to keep.</p>
-        </details>
+        <p className="max-w-2xl text-slate-600">We use an external AI service to read your receipts.</p>
+
         <div className="flex flex-wrap items-center gap-2">
         <button aria-label="Try two sample receipts" title="Try two sample receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}><FlaskConical className="mr-2 inline h-4 w-4" aria-hidden="true" />Samples</button>
         {(items.length > 0 || errorMessage) && <button aria-label="Clear saved receipts" title="Clear saved receipts" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}
@@ -1064,6 +1091,7 @@ export default function Home() {
           </div>
         ) : null}
       </main>
+      <ProductFooter />
     </>
   );
 }

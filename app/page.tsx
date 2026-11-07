@@ -362,9 +362,9 @@ function ExpandedReceiptDetails({
 
 
 
-      <div className={clsx("mt-2 grid gap-3", "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
-        <div className={clsx("lg:block", showImage && "hidden")}>
-          <div className="grid gap-2 lg:grid-cols-2">
+      <div className={clsx("mt-2 grid grid-cols-1 gap-3", "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
+        <div className={clsx("min-w-0 lg:block", showImage && "hidden")}>
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange} />
             <label className="space-y-1">
               <span className="text-xs font-semibold text-slate-700">Receipt Type</span>
@@ -390,7 +390,7 @@ function ExpandedReceiptDetails({
             </label>
           </div>
 
-          <div className="mt-2 grid gap-2 lg:grid-cols-3">
+          <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-3">
             <CurrencyField id={`${item.id}-currency`} value={item.formValues.currency} error={item.errors.currency} onChange={(value) => onFieldChange(item.id, "currency", value)} />
             <EditableField item={item} field="totalAmount" label="Total Amount" type="number" onFieldChange={onFieldChange} />
             <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange} />
@@ -581,7 +581,7 @@ function ReceiptQueueItemRow({
               aria-expanded={item.expanded}
               title={item.expanded ? "Collapse details" : "Expand details"}
               onClick={() => onToggleExpanded(item.id)}
-              className="inline-flex min-h-11 min-w-0 items-center gap-1 rounded text-left text-sm font-bold text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1 rounded text-left text-sm font-bold text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
             ><span className="truncate">{item.file.name}</span>{item.expanded ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}</button> : <p className="min-w-0 truncate text-sm font-bold text-slate-950" title={item.file.name}>{item.file.name}</p>}
             <span data-testid="receipt-status" className={clsx("inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold leading-4",
               complete ? "bg-emerald-100 text-emerald-800" : item.status === "failed" || hasErrors ? "bg-rose-100 text-rose-800" : dirty || item.extraction ? "bg-amber-100 text-amber-900" : "bg-blue-50 text-blue-800")}>{complete ? <Check className="h-3 w-3" aria-hidden="true" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />}{statusLabel(item)}</span>
@@ -1060,7 +1060,7 @@ export default function Home() {
             <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles} onClick={loadSamples} className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40">Try samples</button>
           </div>
         ) : (
-          <section className="mx-auto max-w-5xl">
+          <section className="mx-auto w-full min-w-0 max-w-5xl">
             {errorMessage ? (
               <div className="mb-4 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
@@ -1090,7 +1090,7 @@ export default function Home() {
         )}
 
         {items.length > 0 ? (
-          <div className="mt-auto pt-6"><FloatingBatchFooter
+          <div className="mt-auto w-full min-w-0 pt-6"><FloatingBatchFooter
             fileCount={items.length}
             busy={busy}
             selectedCount={selectedItems.length}

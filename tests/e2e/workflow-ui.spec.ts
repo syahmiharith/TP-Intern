@@ -148,3 +148,15 @@ for (const width of [375, 768, 1280]) {
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  });
 }
+
+test('long filenames remain within a narrow receipt card',async({page})=>{
+ await page.setViewportSize({width:360,height:900});
+ await gotoHome(page);
+ await page.route('**/api/extract-receipt',route=>route.fulfill({json:{data:highConfidenceExtraction}}));
+ const name='Expense-receipt-with-an-extended-filename-for-the-monthly-finance-review.png';
+ await uploadReceipts(page,[{name,mimeType:'image/png',buffer:Buffer.from('synthetic narrow layout')}]);
+ await page.getByRole('button',{name:'Extract 1 file',exact:true}).click();
+ await page.getByRole('button',{name:`Expand ${name}`,exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'Currency',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

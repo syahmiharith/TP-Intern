@@ -17,7 +17,6 @@ import {
   ZoomIn,
   ZoomOut,
   Download,
-  FileJson,
   Square,
   Sparkles,
   Check,
@@ -683,7 +682,7 @@ function FloatingBatchFooter({
             <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="min-h-11 rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition enabled:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40" title="Only current reviewed receipts can be exported.">
               <Download className="mr-2 inline h-4 w-4" aria-hidden="true" />Export expenses CSV ({eligibleCount})
             </button>
-          {canDownloadSelected && <button aria-label="Export JSON" title="Export provenance JSON" disabled={!canDownloadSelected} onClick={onJson} className="min-h-11 min-w-11 rounded-lg border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40"><FileJson className="h-4 w-4" aria-hidden="true" /></button>}
+          {canDownloadSelected && <button aria-label="Export JSON" title="Export provenance JSON" onClick={onJson} className="min-h-11 min-w-11 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">JSON</button>}
           {hasExtractable && <button
             type="button"
             disabled={!canExtractSelected}

@@ -535,15 +535,7 @@ function ReceiptQueueItemRow({
         item.status === "failed" && "border-rose-200"
       )}
     >
-      {hasLeftEdge ? (
-        <div
-          className={clsx(
-            "absolute left-0 top-0 h-full w-1 rounded-none transition-all duration-300",
-            ["extracted", "edited"].includes(item.status) && (item.resultSeen ? "bg-emerald-300" : "bg-emerald-500"),
-            ["needs-review", "failed"].includes(item.status) && (item.resultSeen ? "bg-rose-300" : "bg-rose-500")
-          )}
-        />
-      ) : null}
+      {hasLeftEdge ? <div className="absolute left-0 top-0 h-full w-1 bg-rose-400" /> : null}
 
       <div
         onClick={handleCardClick}

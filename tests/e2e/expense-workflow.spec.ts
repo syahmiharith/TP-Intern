@@ -49,7 +49,7 @@ for (const width of [375, 768, 1280]) {
 test("deletion persists and unavailable storage is explained", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Try two sample receipts" }).click();
-  await page.getByRole("button", { name: "Clear saved receipts" }).click();
+  await page.getByRole("button", { name: "Clear all saved receipts" }).click();
   await page.waitForTimeout(300);
   await page.reload();
   await expect(page.getByText("Upload receipt files")).toBeVisible();

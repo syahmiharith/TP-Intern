@@ -1,18 +1,18 @@
 "use client";
+import { InlineImage } from "./components/inline-image";
+import { SearchField } from "./components/search-field";
+import { extractionItems, lineItemErrors, type EditableLineItem } from "@/lib/line-items";
 import { CurrencyField } from "./components/currency-field";
 import { readBatch, writeBatch, expensesCsv, sampleReceipt } from "@/lib/expense-workflow";
 
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import type { MouseEvent, ReactNode } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
   Code2,
   MessageSquare,
-  Save,
-  FileText,
   Files,
   Loader2,
   RotateCcw,
@@ -39,7 +39,6 @@ import {
   emptyReceiptForm,
   extractionToFormValues,
 
-  isExtractionComplete,
   maxReceiptImageSizeBytes,
   receiptTypes,
   validateReceiptForm
@@ -51,6 +50,7 @@ type FieldErrors = Partial<Record<keyof ReceiptFormValues, string>>;
 export type ReceiptQueueItem = {
   id: string;
   savedValues?: ReceiptFormValues;
+  lineItems?: EditableLineItem[];
   reviewedAt?: string;
   editedAt?: number;
   extractedAt?: string;
@@ -92,40 +92,27 @@ function formatFileSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
 }
 
-function formatSummary(item: ReceiptQueueItem) {
-  if (item.status === "ready" || item.status === "extracting") return formatFileSize(item.file.size);
-  if (item.status === "failed") return item.errorMessage ?? "Extraction failed. Try again.";
-
-  const merchant = item.formValues.merchantName.trim() || "Unknown merchant";
-  const currency = item.formValues.currency.trim().toUpperCase() || "—";
-  const total = item.formValues.totalAmount.trim() || "—";
-  const date = item.formValues.date.trim() || "—";
-
-  return `${merchant} · ${currency} ${total} · ${date}`;
+function receiptErrors(item: ReceiptQueueItem) {
+  return validateReceiptForm(item.formValues);
 }
-
+function itemLines(item: ReceiptQueueItem) { return item.lineItems ?? extractionItems(item.extraction); }
+function isExportable(item: ReceiptQueueItem) {
+  return Boolean(item.extraction && !["ready", "extracting", "failed"].includes(item.status) && Object.keys(receiptErrors(item)).length === 0 && itemLines(item).every(line => Object.keys(lineItemErrors(line,item.formValues.currency)).length === 0));
+}
 function statusLabel(item: ReceiptQueueItem) {
   if (item.status === "failed") return "Failed";
-  if (isCompleteItem(item)) return "Reviewed";
-  if (item.extraction && JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)) return "Unsaved changes";
-  if (item.extraction) return "Needs review";
-  if (item.status === "ready") return "Queued";
   if (item.status === "extracting") return "Extracting";
-  return item.status[0].toUpperCase() + item.status.slice(1);
+  if (item.extraction) return isExportable(item) ? "Ready" : "Needs attention";
+  return "Queued";
 }
-
-function isCompleteItem(item: ReceiptQueueItem) {
-  return Boolean(item.reviewedAt && item.savedValues && JSON.stringify(item.savedValues) === JSON.stringify(item.formValues) && Object.keys(validateReceiptForm(item.formValues)).length === 0);
+function previousReviewTimestamp(item:ReceiptQueueItem) {
+  return !item.lineItems && JSON.stringify(item.savedValues) === JSON.stringify(item.formValues) ? item.reviewedAt : undefined;
 }
-
 function buildDownloadPayload(item: ReceiptQueueItem) {
   if (!item.extraction) return null;
-
-  return { schemaVersion: 1, receiptId: item.id, fileName: item.file.name,
-    extractedAt: item.extractedAt, requestId: item.requestId,
-    originalExtraction: item.extraction, reviewedValues: item.savedValues,
-    reviewedAt: item.reviewedAt, confidence: item.extraction.confidence };
-
+  return {schemaVersion:2, receiptId:item.id, fileName:item.file.name, extractedAt:item.extractedAt, requestId:item.requestId,
+    originalExtraction:item.extraction, values:item.formValues, items:itemLines(item), updatedAt:new Date(item.editedAt ?? Date.now()).toISOString(),
+    previousReview:item.reviewedAt ? {values:item.savedValues,reviewedAt:item.reviewedAt} : undefined, confidence:item.extraction.confidence};
 }
 
 function downloadJson(fileName: string, payload: unknown) {
@@ -345,107 +332,73 @@ function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClos
   );
 }
 
-function ExpandedReceiptDetails({
-  item,
-  onFieldChange
-}: {
-  item: ReceiptQueueItem;
-  onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
+const typeOptions = receiptTypes.map(value => ({value,label:value}));
+function ExpandedReceiptDetails({item,onFieldChange,onLineChange,onAddLine,onRemoveLine}: {
+  item:ReceiptQueueItem;
+  onFieldChange:(id:string,field:keyof ReceiptFormValues,value:string)=>void;
+  onLineChange:(id:string,index:number,field:keyof EditableLineItem,value:string)=>void;
+  onAddLine:(id:string)=>void; onRemoveLine:(id:string,index:number)=>void;
 }) {
-  const [showImage, setShowImage] = useState(false);
-
-  useEffect(() => {
-    if (Object.keys(item.errors).length) setShowImage(false);
-  }, [item.errors]);
-
-  return (
-    <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2.5">
-      <button className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 lg:hidden" aria-pressed={showImage} onClick={() => setShowImage((value) => !value)}>{showImage ? <FileText className="mr-1 inline h-4 w-4" aria-hidden="true" /> : <Eye className="mr-1 inline h-4 w-4" aria-hidden="true" />}{showImage ? "Show form" : "Show receipt image"}</button>
-
-
-
-      <div className={clsx("mt-2 grid grid-cols-1 gap-3", "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
-        <div className={clsx("min-w-0 lg:block", showImage && "hidden")}>
-          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-            <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange} />
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-700">Receipt Type</span>
-              <select
-                id={`${item.id}-receiptType`}
-                aria-label="Receipt Type"
-                value={item.formValues.receiptType}
-                onChange={(event) => onFieldChange(item.id, "receiptType", event.target.value)}
-                aria-invalid={Boolean(item.errors.receiptType)}
-                className={clsx(
-                  "min-h-11 w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
-                  item.errors.receiptType ? "border-rose-300 bg-rose-50" : "border-slate-200"
-                )}
-              >
-                <option value="">Select type</option>
-                {receiptTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-              {item.errors.receiptType ? <p className="text-xs font-medium text-rose-600">{item.errors.receiptType}</p> : null}
-            </label>
-          </div>
-
-          <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-3">
-            <CurrencyField id={`${item.id}-currency`} value={item.formValues.currency} error={item.errors.currency} onChange={(value) => onFieldChange(item.id, "currency", value)} />
-            <EditableField item={item} field="totalAmount" label="Total Amount" type="number" onFieldChange={onFieldChange} />
-            <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange} />
-          </div>
-
-
+  return <div className="grid min-w-0 grid-cols-1 gap-4 border-t border-slate-100 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="min-w-0 space-y-4">
+      {item.errorMessage && <p role="alert" className="text-sm text-rose-700">{item.errorMessage}</p>}
+      {item.extraction ? <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange}/>
+          <SearchField id={`${item.id}-receiptType`} label="Receipt Type" value={item.formValues.receiptType} options={typeOptions} onChange={value=>onFieldChange(item.id,"receiptType",value)}/>
         </div>
-
-        <aside className={clsx("rounded-xl border border-slate-200 bg-white p-2 lg:block lg:sticky lg:top-32 lg:self-start", !showImage && "hidden")}>
-            <p className="mb-2 text-xs font-semibold text-slate-700">Receipt image</p>
-            <div className="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-50">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Blob preview URLs cannot be optimized by next/image. */}
-              <img src={item.previewUrl} alt={`Inline preview of ${item.file.name}`} className="mx-auto max-h-72 w-auto object-contain" />
-            </div>
-
-          </aside>
-      </div>
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+          <CurrencyField id={`${item.id}-currency`} value={item.formValues.currency} error={receiptErrors(item).currency} onChange={value=>onFieldChange(item.id,"currency",value)}/>
+          <EditableField item={item} field="totalAmount" label="Total Amount" inputMode="decimal" onFieldChange={onFieldChange}/>
+          <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange}/>
+        </div>
+        <ReceiptInsights item={item} onLineChange={onLineChange} onAddLine={onAddLine} onRemoveLine={onRemoveLine}/>
+      </> : <div className="space-y-3 text-sm text-slate-600">
+        <p>{item.file.name} · {formatFileSize(item.file.size)}</p>
+      </div>}
     </div>
-  );
+    <InlineImage source={item.previewUrl} filename={item.file.name}/>
+  </div>;
 }
 
-function ReceiptInsights({ item }: { item: ReceiptQueueItem }) {
-  if (!item.extraction) return null;
-  const notes = item.formValues.notes.split("\n").map((note) => note.trim()).filter(Boolean);
-  const originalNotes = item.extraction.notes.filter((note) => !notes.includes(note.trim()));
-  return <section aria-label="Receipt details" className="space-y-3 border-t border-slate-100 px-4 py-3">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h3 className="text-xs font-semibold text-slate-700">Notes</h3>
-      <p className="text-xs text-slate-500" title="The model’s confidence in its original extraction. Unchanged by your edits or review.">Extraction confidence <span className="font-semibold capitalize text-slate-700">{item.extraction.confidence}</span></p>
-    </div>
-    <ul aria-label="Notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">
-      {(notes.length ? notes : ["No notes."]).map((note, index) => <li key={index}>{note}</li>)}
-    </ul>
-    {originalNotes.length > 0 && <div>
-      <h3 className="mb-1 text-xs font-semibold text-slate-700">Extraction notes</h3>
-      <ul aria-label="Extraction notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">{originalNotes.map((note, index) => <li key={index}>{note}</li>)}</ul>
-    </div>}
-    {item.extraction.items.length > 0 && <div>
-      <h3 className="mb-2 text-xs font-semibold text-slate-700">Extracted items ({item.extraction.items.length})</h3>
-      <div className="overflow-hidden rounded-lg border border-slate-200">
-        <table aria-label="Extracted items" className="w-full table-fixed text-left text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-500"><tr>
-            <th className="px-3 py-2 font-medium">Item</th><th className="w-14 px-2 py-2 text-right font-medium">Qty</th><th className="w-20 px-3 py-2 text-right font-medium">Value</th>
-          </tr></thead>
-          <tbody>{item.extraction.items.map((line, index) => <tr key={index} className="border-t border-slate-100">
-            <td className="px-3 py-2 text-slate-800 [overflow-wrap:anywhere]">{line.name}</td>
-            <td className="px-2 py-2 text-right text-slate-600 [overflow-wrap:anywhere]">{line.quantity ?? "—"}</td>
-            <td className="px-3 py-2 text-right text-slate-600 [overflow-wrap:anywhere]">{line.value ?? "—"}</td>
-          </tr>)}</tbody>
-        </table>
+function ReceiptInsights({item,onLineChange,onAddLine,onRemoveLine}: {
+  item:ReceiptQueueItem;
+  onLineChange:(id:string,index:number,field:keyof EditableLineItem,value:string)=>void;
+  onAddLine:(id:string)=>void; onRemoveLine:(id:string,index:number)=>void;
+}) {
+  if(!item.extraction)return null;
+  const notes=item.formValues.notes.split("\n").map(note=>note.trim()).filter(Boolean);
+  const originalNotes=item.extraction.notes.filter(note=>!notes.includes(note.trim()));
+  const lines=itemLines(item);
+  return <div className="space-y-4">
+    <section aria-label="Receipt notes" className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-xs font-semibold text-slate-700">Notes</h3>
+        <p className="text-xs text-slate-500" title="Confidence in the original extraction; unchanged by edits.">Extraction confidence <span className="font-semibold capitalize text-slate-700">{item.extraction.confidence}</span></p>
       </div>
-    </div>}
-  </section>;
+      <ul aria-label="Notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">{(notes.length?notes:["No notes."]).map((note,index)=><li key={index}>{note}</li>)}</ul>
+      {originalNotes.length>0&&<><h3 className="text-xs font-semibold text-slate-700">Extraction notes</h3><ul aria-label="Extraction notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">{originalNotes.map((note,index)=><li key={index}>{note}</li>)}</ul></>}
+    </section>
+    <section aria-label="Extracted items" className="space-y-2">
+      <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold text-slate-700">Extracted items ({lines.length})</h3>
+        <button id={`${item.id}-add-item`} type="button" onClick={()=>onAddLine(item.id)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Plus className="h-3.5 w-3.5" aria-hidden="true"/>Add item</button>
+      </div>
+      {lines.length>0&&<div role="table" aria-label="Extracted items" className="min-w-0 rounded-lg border border-slate-200 bg-white">
+        <div role="row" className="grid grid-cols-[minmax(0,1fr)_3.5rem_5rem_2.5rem] gap-1 border-b border-slate-100 px-2 py-2 text-xs font-medium text-slate-500">
+          <span role="columnheader">Name</span><span role="columnheader" className="text-right">Qty</span><span role="columnheader" className="text-right">Price{item.formValues.currency?` (${item.formValues.currency.trim().toUpperCase()})`:""}</span><span role="columnheader" className="sr-only">Actions</span>
+        </div>
+        {lines.map((line,index)=>{const errors=lineItemErrors(line,item.formValues.currency);return <div role="row" key={index} className="grid min-w-0 grid-cols-[minmax(0,1fr)_3.5rem_5rem_2.5rem] items-start gap-1 border-b border-slate-100 px-2 py-1 last:border-0">
+          {(["name","quantity","price"] as const).map(field=><div role="cell" key={field} className="min-w-0">
+            <input id={`${item.id}-item-${index}-${field}`} aria-label={`Item ${index+1} ${field}`} value={line[field]} type="text" inputMode={field==="name"?"text":"decimal"} autoComplete="off"
+              aria-invalid={Boolean(errors[field])} aria-describedby={errors[field]?`${item.id}-item-${index}-${field}-error`:undefined}
+              onChange={event=>onLineChange(item.id,index,field,event.target.value)}
+              className={clsx("min-h-11 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100",field!=="name"&&"text-right tabular-nums",errors[field]&&"!border-rose-300 bg-rose-50")}/>
+            {errors[field]&&<p id={`${item.id}-item-${index}-${field}-error`} className="px-1 text-xs text-rose-600">{errors[field]}</p>}
+          </div>)}
+          <div role="cell"><IconButton label={`Remove item ${index+1}`} onClick={()=>onRemoveLine(item.id,index)} tone="delete"><Trash2 className="h-3.5 w-3.5" aria-hidden="true"/></IconButton></div>
+        </div>;})}
+      </div>}
+    </section>
+  </div>;
 }
 
 function EditableField({
@@ -453,15 +406,17 @@ function EditableField({
   field,
   label,
   type = "text",
+  inputMode = "text",
   onFieldChange
 }: {
   item: ReceiptQueueItem;
   field: keyof ReceiptFormValues;
   label: string;
   type?: string;
+  inputMode?: "text" | "decimal";
   onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
 }) {
-  const error = item.errors[field];
+  const error = receiptErrors(item)[field];
 
   return (
     <label className="space-y-1" htmlFor={`${item.id}-${field}`}>
@@ -470,6 +425,8 @@ function EditableField({
         id={`${item.id}-${field}`}
         aria-label={label}
         type={type}
+        inputMode={inputMode}
+        autoComplete="off"
         value={item.formValues[field]}
         onChange={(event) => onFieldChange(item.id, field, event.target.value)}
         aria-invalid={Boolean(error)}
@@ -484,141 +441,39 @@ function EditableField({
   );
 }
 
-function ReceiptQueueItemRow({
-  item,
-  onToggleSelected,
-  onToggleExpanded,
-  onPreview,
-  onDelete,
-  onFieldChange,
-  onSave,
-  onDiscard,
-  onReview,
-  onRetry,
-  busy
-}: {
-  item: ReceiptQueueItem;
-  onToggleSelected: (id: string) => void;
-  onToggleExpanded: (id: string) => void;
-  onPreview: (id: string) => void;
-  onDelete: (id: string) => void;
-  onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
-  onSave: (id: string) => void;
-  onDiscard: (id: string) => void;
-  onReview: (id: string) => void;
-  onRetry: (id: string) => void;
-  busy: boolean;
+function ReceiptQueueItemRow({item,onToggleSelected,onToggleExpanded,onPreview,onDelete,onFieldChange,onLineChange,onAddLine,onRemoveLine,onRetry,busy}: {
+  item:ReceiptQueueItem; onToggleSelected:(id:string)=>void; onToggleExpanded:(id:string)=>void; onPreview:(id:string)=>void; onDelete:(id:string)=>void;
+  onFieldChange:(id:string,field:keyof ReceiptFormValues,value:string)=>void;
+  onLineChange:(id:string,index:number,field:keyof EditableLineItem,value:string)=>void;
+  onAddLine:(id:string)=>void; onRemoveLine:(id:string,index:number)=>void; onRetry:(id:string)=>void; busy:boolean;
 }) {
-  const complete = isCompleteItem(item);
-  const dirty = Boolean(item.extraction && JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues));
-  const hasErrors = Object.values(item.errors).some(Boolean);
-  const hasLeftEdge = item.status === "failed" || hasErrors;
-  const canShowProcessedActions = Boolean(item.extraction);
-  const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (!canShowProcessedActions) return;
-
-    const target = event.target as HTMLElement;
-    if (target.closest("button, input, select, textarea, label, a")) return;
-
-    onToggleExpanded(item.id);
-  };
-
-
-  return (
-    <article
-      aria-busy={item.status === "extracting"}
-      className={clsx(
-        "relative rounded-2xl border bg-white shadow-sm transition-colors duration-300",
-        !complete && !hasLeftEdge && item.status !== "extracting" && "border-slate-200",
-        item.status === "extracting" && "border-blue-200",
-        complete && "border-emerald-200",
-        hasErrors && "border-rose-200",
-
-        item.status === "failed" && "border-rose-200"
-      )}
-    >
-      {hasLeftEdge ? <div className="absolute left-0 top-0 h-full w-1 bg-rose-400" /> : null}
-
-      <div
-        onClick={handleCardClick}
-        title={canShowProcessedActions ? (item.expanded ? "Collapse receipt details" : "Expand receipt details") : undefined}
-        data-testid={`receipt-row-toggle-${item.file.name}`}
-        className={clsx(
-          "relative min-h-[96px] rounded-t-2xl px-3 py-3 pl-16",
-          canShowProcessedActions && "cursor-pointer hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
-        )}
-      >
-        <button
-          type="button"
-          aria-label={item.selected ? `Deselect ${item.file.name}` : `Select ${item.file.name}`}
-          title={item.selected ? "Deselect file" : "Select file"}
-          aria-pressed={item.selected}
-          disabled={busy}
-          onClick={() => onToggleSelected(item.id)}
-          className="absolute left-3 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {item.selected ? <Check className="h-4 w-4 text-blue-600" aria-hidden="true" /> : <span className="h-3.5 w-3.5 rounded-full border border-slate-400" />}
+  const ready=isExportable(item);
+  const failed=item.status==="failed";
+  return <article aria-busy={item.status==="extracting"} className={clsx("relative min-w-0 rounded-2xl border bg-white shadow-sm",failed?"border-rose-200":"border-slate-200")}>
+    <div data-testid={`receipt-row-toggle-${item.file.name}`} onClick={event=>{if(!(event.target as HTMLElement).closest("button,a,input"))onToggleExpanded(item.id);}} className="relative flex min-h-20 min-w-0 items-center gap-2 rounded-t-2xl px-3 py-2 hover:bg-slate-50/60">
+      <button type="button" aria-label={`${item.selected?"Deselect":"Select"} ${item.file.name}`} title={item.selected?"Deselect file":"Select file"} aria-pressed={item.selected} disabled={busy} onClick={()=>onToggleSelected(item.id)}
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40">
+        {item.selected?<Check className="h-4 w-4 text-blue-600" aria-hidden="true"/>:<Square className="h-4 w-4" aria-hidden="true"/>}
+      </button>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+        <button type="button" aria-label={`${item.expanded?"Collapse":"Expand"} ${item.file.name}`} aria-expanded={item.expanded} onClick={()=>onToggleExpanded(item.id)}
+          className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1 rounded text-left text-sm font-bold text-slate-950">
+          <span className="truncate">{item.file.name}</span>{item.expanded?<ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true"/>:<ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true"/>}
         </button>
-
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pr-24">
-            {canShowProcessedActions ? <button
-              aria-label={`${item.expanded ? "Collapse" : "Expand"} ${item.file.name}`}
-              aria-expanded={item.expanded}
-              title={item.expanded ? "Collapse details" : "Expand details"}
-              onClick={() => onToggleExpanded(item.id)}
-              className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1 rounded text-left text-sm font-bold text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
-            ><span className="truncate">{item.file.name}</span>{item.expanded ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}</button> : <p className="min-w-0 truncate text-sm font-bold text-slate-950" title={item.file.name}>{item.file.name}</p>}
-            <span id={`${item.id}-status`} role="status" tabIndex={-1} data-testid="receipt-status" className={clsx("inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold leading-4",
-              complete ? "bg-emerald-100 text-emerald-800" : item.status === "failed" || hasErrors ? "bg-rose-100 text-rose-800" : dirty || item.extraction ? "bg-amber-100 text-amber-900" : "bg-blue-50 text-blue-800")}>{complete ? <Check className="h-3 w-3" aria-hidden="true" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />}{statusLabel(item)}</span>
-            {canShowProcessedActions && !item.expanded && item.formValues.receiptType ? (
-              <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                {item.formValues.receiptType}
-              </span>
-            ) : null}
-          </div>
-          {(!item.expanded || item.status === "failed") && <div className="mt-1.5 min-w-0">
-            <p className={clsx("min-w-0 text-sm text-slate-600", item.status === "failed" ? "break-words" : "truncate")} title={formatSummary(item)}>
-              {formatSummary(item)}
-            </p>
-          </div>}
-        </div>
-
-        <div className="absolute right-3 top-4 flex items-center justify-end gap-1.5">
-          <IconButton label={`Preview ${item.file.name}`} onClick={(event) => { event.currentTarget.focus(); onPreview(item.id); }} tone="preview">
-            <Eye className="h-4 w-4" aria-hidden="true" />
-          </IconButton>
-          <IconButton label={`Delete ${item.file.name}`} disabled={busy} onClick={() => onDelete(item.id)} tone="delete">
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </IconButton>
-        </div>
-
-
+        <span data-testid="receipt-status" role="status" className={clsx("inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold leading-4",failed?"bg-rose-100 text-rose-800":ready?"bg-emerald-100 text-emerald-800":item.extraction?"bg-amber-100 text-amber-900":"bg-blue-50 text-blue-800")}
+          title={item.extraction&&!ready?"Open the receipt to correct highlighted fields":undefined}><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"/>{statusLabel(item)}</span>
       </div>
-
-      {item.expanded && item.extraction ? <ExpandedReceiptDetails item={item} onFieldChange={onFieldChange} /> : null}
-      <ReceiptInsights item={item} />
-
-      {(item.status === "failed" || (!item.extraction && item.selected && item.status !== "extracting")) && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-sm">
-        {item.selected && <p className="text-slate-600">{item.status === "failed" ? "Retry this receipt to continue." : "Extract and review to export."}</p>}
-        {item.status === "failed" && <button disabled={busy} onClick={() => onRetry(item.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40"><RotateCcw className="h-4 w-4" aria-hidden="true" />Retry</button>}
-      </div>}
-      {item.extraction && !complete && <div className="space-y-2 border-t border-slate-200 px-4 py-3 text-sm">
-        {item.selected && <p className="text-slate-600">{hasErrors ? "Complete the highlighted fields to export." : dirty ? "Save your changes, then mark reviewed." : "Review to include in your export."}</p>}
-        <div className="flex flex-wrap gap-2 [&_button]:min-h-11 [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-blue-500 [&_button:disabled]:opacity-40">
-          {dirty && <>
-            <button aria-label="Save changes" title="Save changes" className="inline-flex items-center gap-2 border border-slate-300 bg-white hover:bg-slate-50" onClick={() => onSave(item.id)}><Save className="h-4 w-4" aria-hidden="true" />Save changes</button>
-            <button aria-label="Discard changes" title="Restore the last saved values" className="text-slate-600 hover:bg-slate-100" onClick={() => onDiscard(item.id)}>Discard changes</button>
-          </>}
-          <button id={`${item.id}-review`} disabled={dirty} title={dirty ? "Save or discard your changes first" : "Approve these saved values for export"} className="inline-flex items-center gap-2 border border-slate-300 bg-white hover:bg-slate-50" onClick={() => onReview(item.id)}><Check className="h-4 w-4" aria-hidden="true" />Mark reviewed</button>
-        </div>
-      </div>}
-
-      {item.status === "extracting" && <div role="progressbar" aria-label={`Extracting ${item.file.name}`} aria-valuetext="Waiting for extraction result" className="extraction-progress absolute inset-x-0 bottom-0 h-[3px] overflow-hidden rounded-b-2xl bg-blue-100">
-        <span aria-hidden="true" className="extraction-progress-segment absolute inset-y-0 left-0 w-1/3 rounded-full bg-blue-600" />
-      </div>}
-    </article>
-  );
+      <div className="flex shrink-0 gap-1">
+        <IconButton label={`Preview ${item.file.name}`} onClick={event=>{event.currentTarget.focus();onPreview(item.id);}} tone="preview"><Eye className="h-4 w-4" aria-hidden="true"/></IconButton>
+        <IconButton label={`Delete ${item.file.name}`} disabled={busy} onClick={()=>onDelete(item.id)} tone="delete"><Trash2 className="h-4 w-4" aria-hidden="true"/></IconButton>
+      </div>
+    </div>
+    {item.expanded&&<>
+      <ExpandedReceiptDetails item={item} onFieldChange={onFieldChange} onLineChange={onLineChange} onAddLine={onAddLine} onRemoveLine={onRemoveLine}/>
+      {failed&&<div className="border-t border-slate-100 px-4 py-2"><button disabled={busy} onClick={()=>onRetry(item.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40"><RotateCcw className="h-4 w-4" aria-hidden="true"/>Retry</button></div>}
+    </>}
+    {item.status==="extracting"&&<div role="progressbar" aria-label={`Extracting ${item.file.name}`} aria-valuetext="Waiting for extraction result" className="extraction-progress absolute inset-x-0 bottom-0 h-[3px] overflow-hidden rounded-b-2xl bg-blue-100"><span aria-hidden="true" className="extraction-progress-segment absolute inset-y-0 left-0 w-1/3 rounded-full bg-blue-600"/></div>}
+  </article>;
 }
 
 function FloatingBatchFooter({
@@ -671,7 +526,7 @@ function FloatingBatchFooter({
         )}
         <div className="flex flex-wrap items-center gap-2">
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
-            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="min-h-11 rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition enabled:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40" title={canDownloadSelected ? "Export selected, reviewed expenses" : "Select and review a receipt to export"}>
+            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="min-h-11 rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition enabled:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40" title={canDownloadSelected ? "Export selected expenses" : "Select a valid receipt to export"}>
               <Download className="mr-2 inline h-4 w-4" aria-hidden="true" />Export expenses CSV ({eligibleCount})
             </button>
           {canDownloadSelected && <button aria-label="Export JSON" title="Export provenance JSON" onClick={onJson} className="min-h-11 min-w-11 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">JSON</button>}
@@ -745,7 +600,7 @@ export default function Home() {
     () => selectedItems.filter((item) => extractableStatuses.includes(item.status)),
     [selectedItems]
   );
-  const completeSelectedItems = useMemo(() => selectedItems.filter(isCompleteItem), [selectedItems]);
+  const completeSelectedItems = useMemo(() => selectedItems.filter(isExportable), [selectedItems]);
   const canAddMore = !legacy && hydrated && !busy && !addingFiles && items.length < maxFiles;
   const previewItem = items.find((item) => item.id === previewItemId) ?? null;
 
@@ -758,13 +613,13 @@ export default function Home() {
       setItems(saved.map((item) => ({ ...item, previewUrl: URL.createObjectURL(item.file),
         status: item.status === "extracting" ? "failed" : item.status,
         errorMessage: item.status === "extracting" ? "Extraction interrupted. Retry when ready." : item.errorMessage })));
-    }).catch(() => setErrorMessage("Saved data could not be opened. Keep this tab open and export reviewed receipts before leaving."))
+    }).catch(() => setErrorMessage("Saved data could not be opened. Keep this tab open and export your expenses before leaving."))
       .finally(() => setHydrated(true));
   }, []);
 
   useEffect(() => {
     if (!hydrated || !storageReady.current) return;
-    writeBatch(items).catch(() => setErrorMessage("Could not save on this device. Keep this tab open and export reviewed receipts before leaving."));
+    writeBatch(items).catch(() => setErrorMessage("Could not save on this device. Keep this tab open and export your expenses before leaving."));
   }, [items, hydrated]);
 
   useEffect(() => {
@@ -905,11 +760,11 @@ export default function Home() {
 
       const formValues = extractionToFormValues(payload.data);
       const errors = validateReceiptForm(formValues);
-      const complete = isExtractionComplete(payload.data);
+
 
       updateItem(id, (current) => ({
         ...current,
-        status: complete ? "extracted" : "needs-review",
+        status: "extracted",
         progress: 100,
         extraction: payload.data ?? null,
         savedValues: formValues,
@@ -966,41 +821,19 @@ export default function Home() {
     }));
   }
 
-  function focusFirstError(id: string, errors: FieldErrors) {
-    const field = Object.keys(errors)[0];
-    if (field) document.getElementById(`${id}-${field}`)?.focus();
+  function updateLine(id:string,index:number,field:keyof EditableLineItem,value:string) {
+    updateItem(id,item=>({...item,editedAt:Date.now(),lineItems:itemLines(item).map((line,i)=>i===index?{...line,[field]:value}:line)}));
   }
-
-  function saveChanges(id: string) {
-    const item = items.find((candidate) => candidate.id === id);
-    if (!item || JSON.stringify(item.savedValues) === JSON.stringify(item.formValues)) return;
-    const errors = validateReceiptForm(item.formValues);
-    const invalid = Object.keys(errors).length > 0;
-    flushSync(() => updateItem(id, (current) => invalid
-      ? { ...current, errors, expanded: true }
-      : { ...current, savedValues: { ...current.formValues }, reviewedAt: undefined,
-        editedAt: Date.now(), errors, status: "needs-review", resultSeen: true }));
-    if (invalid) focusFirstError(id, errors);
-    else { setRemovedToast("Changes saved."); document.getElementById(`${id}-review`)?.focus(); }
+  function addLine(id:string) {
+    const current=items.find(item=>item.id===id);
+    if(!current)return;
+    const count=itemLines(current).length;
+    updateItem(id,item=>({...item,editedAt:Date.now(),lineItems:[...itemLines(item),{name:"",quantity:"",price:""}]}));
+    requestAnimationFrame(()=>document.getElementById(`${id}-item-${count}-name`)?.focus());
   }
-
-  function markReviewed(id: string) {
-    const item = items.find((candidate) => candidate.id === id);
-    if (!item || JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)) return;
-    const errors = validateReceiptForm(item.formValues);
-    const invalid = Object.keys(errors).length > 0;
-    flushSync(() => updateItem(id, (current) => ({
-      ...current, errors, expanded: invalid || current.expanded,
-      reviewedAt: invalid ? undefined : new Date().toISOString(), editedAt: Date.now()
-    })));
-    if (invalid) focusFirstError(id, errors);
-    else { setRemovedToast("Receipt reviewed."); document.getElementById(`${id}-status`)?.focus(); }
-  }
-
-  function discardChanges(id: string) {
-    flushSync(() => updateItem(id, (current) => ({ ...current, formValues: { ...(current.savedValues ?? current.formValues) }, errors: {} })));
-    setRemovedToast("Changes discarded.");
-    document.getElementById(`${id}-status`)?.focus();
+  function removeLine(id:string,index:number) {
+    updateItem(id,item=>({...item,editedAt:Date.now(),lineItems:itemLines(item).filter((_,i)=>i!==index)}));
+    requestAnimationFrame(()=>document.getElementById(`${id}-add-item`)?.focus());
   }
 
   async function clearSavedData() {
@@ -1022,7 +855,7 @@ export default function Home() {
   function downloadSelected() {
     const payload = completeSelectedItems.map(buildDownloadPayload).filter(Boolean);
     if (!payload.length) return;
-    const csv = expensesCsv(completeSelectedItems.map((item) => ({ id: item.id, source: item.file.name, values: item.savedValues!, reviewedAt: item.reviewedAt! })));
+    const csv = expensesCsv(completeSelectedItems.map((item) => ({ id: item.id, source: item.file.name, values: item.formValues, reviewedAt: previousReviewTimestamp(item), items: itemLines(item) })));
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = "expenses.csv"; link.click(); URL.revokeObjectURL(url);
     setRemovedToast("CSV export started.");
@@ -1033,7 +866,7 @@ export default function Home() {
       <AppHeader />
       <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
         <h1 className="text-2xl font-bold">Receipts in. Expenses ready.</h1>
-        <p className="max-w-2xl text-slate-600">Extract the details, review your expenses, and export to your spreadsheet.</p>
+        <p className="max-w-2xl text-slate-600">Extract the details, make any corrections, and export to your spreadsheet.</p>
 
         <div className="flex flex-wrap items-center gap-2">
         {items.length > 0 && <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>}
@@ -1076,11 +909,11 @@ export default function Home() {
                   onPreview={openPreview}
                   onDelete={deleteItem}
                   onFieldChange={updateField}
-                  onSave={saveChanges}
-                  onReview={markReviewed}
+                  onLineChange={updateLine}
+                  onAddLine={addLine}
+                  onRemoveLine={removeLine}
                   onRetry={(id) => { void extractSelected([id]); }}
                   busy={busy}
-                  onDiscard={discardChanges}
                 />
               ))}
             </div>

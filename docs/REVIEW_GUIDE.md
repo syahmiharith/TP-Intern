@@ -1,23 +1,25 @@
-# Receipt-to-Form review guide
+# Receipt-to-Form release checks
 
 Main entry: https://receipt-to-form-syahmiharith.vercel.app.
 
 ## Product journey
 
-Upload up to five supported images, or load optional samples. All receipts use one queue, editor and storage path. Extract uploads and compare the image with the fields. After an edit, Save changes commits the revision; Mark reviewed approves it. Unchanged receipts can be reviewed directly. Discard changes restores the saved revision and its review status.
+Upload up to five images, or use optional samples. Expand a row to see every expense field, immutable notes, editable items and an interactive image. Current values save automatically on this device. There is no Save, Discard or Mark reviewed step. Any valid selected receipt can export immediately, independently of model confidence.
 
-Use the batch toolbar's single CSV export action for eligible selected receipts. Each selected exclusion is explained on its card. JSON is secondary provenance output. Editing a reviewed receipt immediately blocks its export; refresh must restore that pending edit. Original model confidence remains unchanged by human corrections.
+A collapsed row shows its filename, one status pill and compact controls. Selection has no surrounding border or instructional subtext. Receipt type uses the same searchable dropdown design as currency. Merchant and item names are text; quantities accept positive fractions; prices are decimal strings and may include zero or discounts. Unknown quantities/prices remain blank. Dates use the platform calendar. Receipt total remains independent of item edits so tax, tips and discounts are not silently overwritten.
 
-## Checks
+## Verification
 
-- Correct the sample stationery total from 23.00 to 28.00, save and review; inspect the downloaded CSV.
-- Edit a reviewed total, verify export blocks, refresh, restore the pending correction, save and review again. Confirm CSV, receipt ID and original confidence.
-- Test Discard separately and verify reviewed export eligibility returns.
-- Mix samples and an uploaded synthetic receipt in the same queue.
-- Exercise keyboard preview and card actions, mobile image/form switching, validation, retries and stopping remaining work.
-- Check 375px, tablet and desktop widths; the toolbar must not obscure fields or receipt actions.
-- Verify an empty legacy origin redirects only after storage loads. Existing legacy receipts, unknown schemas and storage errors must stay recoverable. Explicit clearing must complete before navigation.
+- Export samples directly. Set an invalid total, verify immediate exclusion, then correct it and refresh. Inspect current values in the downloaded CSV without an approval step.
+- Edit item name, fractional quantity and price. Refresh and inspect exact strings in CSV's appended `items` column and JSON's `items`. Check unchanged original extraction, confidence and receipt ID.
+- Add/remove an item. Test currency decimals, zero and negative prices, unknown blanks and invalid exponent notation.
+- Collapse/expand: all details belong inside the expanded editor; exactly one status pill remains on the row.
+- Exercise inline zoom, rotation, pointer dragging and keyboard panning. Fields and image remain available together on mobile.
+- Retain mixed samples/uploads, retries, stopping, storage failure, expiry, deletion, schema migration and legacy-host recovery checks.
+- Check 360px, 375px, tablet and desktop. The bottom toolbar must not obstruct fields.
 
-## Engineering checks
+## Output compatibility
 
-Run lint, TypeScript, unit/API/UI tests, Playwright and production build. Deterministic tests mock the provider; real extraction is separately enabled with RUN_LIVE_GEMINI_E2E=1. Shared rate/budget limits and provider quota still apply. Never upload real expense data for showcase testing.
+IndexedDB remains version 2. Existing images, corrections and old review metadata are preserved. JSON provenance is version 2: current `values` and `items` are separate from `originalExtraction`; historical approval is under `previousReview` when present. CSV retains its first nine columns and appends `items` as JSON. The historical review timestamp column is blank unless an earlier approval still matches the unchanged receipt. Automatic saving never fabricates review.
+
+Run lint, types, unit/API/UI tests, Playwright, production build, the deployed sample path and an explicitly enabled synthetic live-provider extraction. Do not use real expense data for showcase testing.

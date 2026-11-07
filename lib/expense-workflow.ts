@@ -1,3 +1,4 @@
+import type { EditableLineItem } from "./line-items";
 import type { ReceiptQueueItem } from "@/app/page";
 import { extractionToFormValues, type ReceiptFormValues, type ReceiptExtraction } from "./receipt";
 
@@ -110,12 +111,12 @@ export function writeBatch(items: ReceiptQueueItem[]) {
   pendingWrite = write;
   return write;
 }
-export function expensesCsv(rows: { id: string; source: string; values: ReceiptFormValues; reviewedAt: string }[]) {
+export function expensesCsv(rows: { id: string; source: string; values: ReceiptFormValues; reviewedAt?: string; items?: EditableLineItem[] }[]) {
   function cell(value: string) {
     const safe = /^[\s]*[=+@\-]/.test(value) || /^[\t\r\n]/.test(value) ? "'" + value : value;
     return '"' + safe.replaceAll('"', '""') + '"';
   }
-  return ["receipt ID,source filename,merchant,date,category,currency,total,notes,reviewed timestamp", ...rows.map(({ id, source, values: v, reviewedAt }) => [id, source, v.merchantName, v.date, v.receiptType || "Other", v.currency.trim().toUpperCase(), v.totalAmount, v.notes, reviewedAt].map(cell).join(","))].join("\r\n");
+  return ["receipt ID,source filename,merchant,date,category,currency,total,notes,reviewed timestamp,items", ...rows.map(({ id, source, values: v, reviewedAt, items }) => [id, source, v.merchantName, v.date, v.receiptType || "Other", v.currency.trim().toUpperCase(), v.totalAmount, v.notes, reviewedAt ?? "", JSON.stringify(items ?? [])].map(cell).join(","))].join("\r\n");
 }
 export function sampleReceipt(merchant: string, actual: string, extracted: string, note = ""): ReceiptQueueItem {
   const canvas = document.createElement("canvas"); canvas.width = 400; canvas.height = 500;

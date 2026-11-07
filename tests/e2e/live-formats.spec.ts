@@ -27,7 +27,7 @@ test("real PNG JPEG and WebP receipts complete one reviewed expense batch", asyn
   await page.locator('input[type="file"]').first().setInputFiles(files);
   await page.getByRole("button", { name: "Extract 3 files", exact: true }).click();
   await expect(page.getByText("3 of 3 processed", { exact: true })).toBeVisible({ timeout: 150000 });
-  await expect(page.locator("article").getByRole("button", { name: "Mark reviewed", exact: true })).toHaveCount(3);
+  await expect(page.locator("article").getByText("Ready", { exact: true })).toHaveCount(3);
   for (const file of files) {
     const row = page.locator("article").filter({ has: page.getByText(file.name, { exact: true }) });
     await row.getByRole("button", { name: `Expand ${file.name}`, exact: true }).click();
@@ -36,8 +36,6 @@ test("real PNG JPEG and WebP receipts complete one reviewed expense batch", asyn
     await row.getByLabel("Currency", { exact: true }).fill("MYR");
     await row.getByLabel("Date", { exact: true }).fill("2026-05-11");
     await row.getByLabel("Total Amount", { exact: true }).fill("22.80");
-    await row.getByRole("button", { name: "Save changes", exact: true }).click();
-    await row.getByRole("button", { name: "Mark reviewed", exact: true }).click();
   }
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export expenses CSV (3)", exact: true }).click();

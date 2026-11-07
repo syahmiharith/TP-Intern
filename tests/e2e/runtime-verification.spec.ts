@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { gotoHome, highConfidenceExtraction, mockExtractionResponse, storedImageCount, uploadReceipts } from "./support/receipt";
+import { expandCurrentReceipt, gotoHome, highConfidenceExtraction, mockExtractionResponse, storedImageCount, uploadReceipts } from "./support/receipt";
 
 async function storedBatch(page: Page) {
   return page.evaluate(() => new Promise<{ schemaVersion: number; items: Array<{ id: string; status: string; formValues: { totalAmount: string } }> }>((resolve, reject) => {
@@ -39,6 +39,7 @@ test.afterEach(async ({ page }, info) => {
 
 test("immutable saved notes and spreadsheet-safe text round trip through CSV and JSON", async ({ page }) => {
   await page.getByRole("button", { name: "Try samples" }).click();
+  await page.getByRole("button",{name:"Deselect Sample stationery.png",exact:true}).click();
   const notes = '=SUM(1,2)\n"Meal", 서울';
   await expect.poll(() => storedImageCount(page)).toBe(2);
   await page.route("**/notes-fixture", route => route.fulfill({contentType:"text/html",body:"<title>Saved notes fixture</title>"}));
@@ -57,8 +58,6 @@ test("immutable saved notes and spreadsheet-safe text round trip through CSV and
   await expect(page.getByRole("list",{name:"Notes",exact:true}).first().getByRole("listitem")).toHaveText(['=SUM(1,2)', '\"Meal\", 서울']);
   await expect(page.getByRole("list",{name:"Extraction notes",exact:true}).first()).toContainText("Client meeting");
   await page.getByLabel("Merchant Name", { exact: true }).first().fill("@Expense cafe");
-  await page.getByRole("button", { name: "Save changes", exact: true }).first().click();
-  await page.getByRole("button", { name: "Mark reviewed", exact: true }).first().click();
   const csvPending = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export expenses CSV (1)", exact: true }).click();
   const csv = await readFile((await (await csvPending).path())!, "utf8");
@@ -68,7 +67,7 @@ test("immutable saved notes and spreadsheet-safe text round trip through CSV and
   await page.getByRole("button", { name: "Export JSON", exact: true }).click();
   const records = JSON.parse(await readFile((await (await jsonPending).path())!, "utf8"));
   expect(records).toHaveLength(1);
-  expect(records[0].reviewedValues.notes).toBe(notes);
+  expect(records[0].values.notes).toBe(notes);
   expect(records[0].originalExtraction.merchantName).toBe("Sample cafe");
   expect(records[0].originalExtraction.notes).not.toContain(notes);
   expect(csv).toContain(records[0].receiptId);
@@ -122,10 +121,11 @@ test("refresh interrupts extraction without automatically repeating the provider
   await expect.poll(async () => (await storedBatch(page)).items[0]?.status).toBe("extracting");
   await page.reload();
   await held?.abort().catch(() => {});
+  await page.getByRole("button", {name:"Expand runtime-0.png",exact:true}).click();
   await expect(page.getByText("Extraction interrupted. Retry when ready.", { exact: true })).toBeVisible();
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Extract 1 file", exact: true }).click();
-  await expect(page.getByText(/FamilyMart · KRW/)).toBeVisible();
+  await expect(page.locator("article").getByText("Ready",{exact:true})).toBeVisible();
   expect(calls).toBe(2);
 });
 
@@ -152,7 +152,7 @@ test("stopping the queue preserves completed receipts and remaining receipts sta
   expect(calls).toBe(1);
   await expect(page.locator("article").getByText("Queued", { exact: true })).toHaveCount(2);
   await page.getByRole("button", { name: "Extract 2 files", exact: true }).click();
-  await expect(page.getByText(/FamilyMart · KRW/)).toHaveCount(3);
+  await expect(page.locator("article").getByText("Ready",{exact:true})).toHaveCount(3);
   expect(calls).toBe(3);
   expect(maxActive).toBe(1);
 });
@@ -226,8 +226,8 @@ test("storage quota errors keep in-memory reviewed values exportable and recover
     };
   });
   await page.getByRole("button", { name: "Try samples" }).click();
+  await page.getByRole("button",{name:"Deselect Sample stationery.png",exact:true}).click();
   await expect(page.locator('main [role="alert"]')).toContainText("Could not save on this device");
-  await page.getByRole("button", { name: "Mark reviewed", exact: true }).first().click();
   await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export expenses CSV (1)", exact: true }).click();
@@ -238,19 +238,16 @@ test("storage quota errors keep in-memory reviewed values exportable and recover
   await expect.poll(async () => (await storedBatch(page)).items.length).toBe(0);
 });
 
-test("review validation opens actionable fields and enforces currency minor units", async ({ page }) => {
+test("live validation displays actionable fields and enforces currency minor units", async ({ page }) => {
   await mockExtractionResponse(page, { ...highConfidenceExtraction, date: "03/04/2026", currency: "$", totalAmount: 12.5 });
   await uploadReceipts(page, files(1));
   await page.getByRole("button", { name: "Extract 1 file", exact: true }).click();
-  await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
+  await expandCurrentReceipt(page, "runtime-0.png");
   await expect(page.getByText("Choose a recognized currency code.", { exact: true })).toBeVisible();
   await page.getByLabel("Date", { exact: true }).fill("2026-11-06");
   await page.getByLabel("Currency", { exact: true }).fill(" jpy ");
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByText("Too many decimal places for this currency.", { exact: true })).toBeVisible();
   await page.getByLabel("Total Amount", { exact: true }).fill("1250");
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
-  await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
   await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export expenses CSV (1)", exact: true }).click();
@@ -260,7 +257,6 @@ test("review validation opens actionable fields and enforces currency minor unit
 test("the last receipt remains actionable at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByRole("button", { name: "Try samples" }).click();
-  await page.getByRole("button", { name: "Mark reviewed", exact: true }).last().click();
   await expect(page.getByLabel("Total Amount", { exact: true }).last()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

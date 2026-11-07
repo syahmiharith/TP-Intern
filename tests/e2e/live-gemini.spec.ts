@@ -32,8 +32,6 @@ test('deployed real-provider extraction through reviewed CSV', async ({ page, ba
   await page.getByLabel('Date', { exact: true }).fill('2026-05-11');
   await page.getByLabel('Currency', { exact: true }).fill('MYR');
   await page.getByLabel('Total Amount', { exact: true }).fill('22.80');
-  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await page.getByRole('button', { name: 'Mark reviewed', exact: true }).click();
   const csvDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export expenses CSV (1)', exact: true }).click();
   const csv = await readFile((await (await csvDownload).path())!, 'utf8');
@@ -44,7 +42,7 @@ test('deployed real-provider extraction through reviewed CSV', async ({ page, ba
   const records = JSON.parse(await readFile((await (await jsonDownload).path())!, 'utf8'));
   expect(records[0].originalExtraction.confidence).toBe(confidence);
   expect(csv).toContain(records[0].receiptId);
-  expect(records[0].reviewedValues.totalAmount).toBe('22.80');
+  expect(records[0].values.totalAmount).toBe('22.80');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Export expenses CSV (1)', exact: true })).toBeEnabled();
 });

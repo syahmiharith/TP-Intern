@@ -28,16 +28,16 @@ for(const state of ['pending','extracting','unsupported','branded'] as const){
   else{
    if(state!=='branded') await expect(page.getByText(/recovering receipts saved at the old address/)).toBeVisible();
    await expect(page.getByLabel('Total Amount',{exact:true})).toHaveValue('28.00');
-   if(state!=='branded') await expect(page.getByRole('button',{name:'Try two sample receipts'})).toBeDisabled();
+   if(state!=='branded') await expect(page.getByRole('button',{name:'Try samples'})).toBeDisabled();
    if(state==='extracting') await expect(page.getByText('Extraction interrupted. Retry when ready.',{exact:true})).toBeVisible();
   }
   expect(new URL(page.url()).origin).toBe(entry);
   await page.getByRole('button',{name:'Clear all saved receipts'}).click();
   await expect(page).toHaveURL(branded+'/');
-  await expect(page.getByRole('button',{name:'Try two sample receipts'})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Try samples'})).toBeEnabled();
  });
 }
-test('empty legacy redirects to branded entry',async({page})=>{await page.goto(legacy);await expect(page).toHaveURL(branded+'/');await expect(page.getByRole('button',{name:'Try two sample receipts'})).toBeEnabled();});
+test('empty legacy redirects to branded entry',async({page})=>{await page.goto(legacy);await expect(page).toHaveURL(branded+'/');await expect(page.getByRole('button',{name:'Try samples'})).toBeEnabled();});
 test('unreadable legacy storage never redirects',async({page})=>{
  await page.addInitScript(()=>{Object.defineProperty(IDBFactory.prototype,'open',{configurable:true,value(){throw new Error('Storage unavailable');}});});await page.goto(legacy);
  await expect(page.getByText(/Saved data could not be opened/)).toBeVisible();expect(new URL(page.url()).origin).toBe(legacy);

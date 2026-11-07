@@ -16,7 +16,7 @@ Gemini-powered receipt extraction and human-review web app. The app turns receip
 
 1. Upload one to five JPG, PNG or WebP receipts, or choose the optional samples.
 2. Extract uploaded receipts and compare each result with its image.
-3. Correct fields, then use **Save changes** and **Mark reviewed** within the receipt card.
+3. Correct fields as needed. Use **Save changes** after editing, then **Mark reviewed** within the receipt card. Unchanged receipts can be reviewed directly.
 4. Use the batch toolbar's **Export expenses CSV** to download the reviewed selected receipts. **Export JSON** retains original model provenance.
 5. Editing blocks export until you save and review again. **Discard changes** restores the saved revision and review status. Refresh restores pending corrections on the same address and device.
 

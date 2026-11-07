@@ -5,8 +5,8 @@ test.describe("receipt upload boundaries", () => {
   test("starts with only the upload area", async ({ page }) => {
     await gotoHome(page);
 
-    await expect(page.getByText("Upload receipt files")).toBeVisible();
-    await expect(page.getByText(/5MB per file/i)).toBeVisible();
+    await expect(page.getByText("Upload receipts")).toBeVisible();
+    await expect(page.getByText(/5 MB each/i)).toBeVisible();
     await expect(page.getByRole("heading", { name: /AI receipt extraction queue/i })).toBeHidden();
   });
 

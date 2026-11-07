@@ -26,7 +26,7 @@ test('deployed real-provider extraction through reviewed CSV', async ({ page, ba
   }
   expect(response.status(), 'Live provider extraction should succeed').toBe(200);
   await expandCurrentReceipt(page, 'live-gemini-receipt.png');
-  const confidence = (await page.getByText(/^(high|medium|low) confidence$/i).innerText()).toLowerCase().replace(' confidence', '');
+  const confidence = (await page.getByText(/^Model confidence: (high|medium|low)$/i).innerText()).toLowerCase().replace('model confidence: ', '');
   expect(Number(await page.getByLabel('Total Amount', { exact: true }).inputValue())).toBeGreaterThan(0);
   await page.getByRole('textbox', { name: 'Merchant Name', exact: true }).fill('Sample Receipt Mart');
   await page.getByLabel('Date', { exact: true }).fill('2026-05-11');

@@ -4,7 +4,7 @@ Main entry: https://receipt-to-form-syahmiharith.vercel.app.
 
 ## Product journey
 
-Upload up to five supported images, or load optional samples. All receipts use one queue, editor and storage path. Extract uploads, compare the image with the fields, correct them, Save changes, then Mark reviewed inside the receipt card. Discard changes restores the saved revision and its review status.
+Upload up to five supported images, or load optional samples. All receipts use one queue, editor and storage path. Extract uploads and compare the image with the fields. After an edit, Save changes commits the revision; Mark reviewed approves it. Unchanged receipts can be reviewed directly. Discard changes restores the saved revision and its review status.
 
 Use the batch toolbar's single CSV export action for eligible selected receipts. Each selected exclusion is explained on its card. JSON is secondary provenance output. Editing a reviewed receipt immediately blocks its export; refresh must restore that pending edit. Original model confidence remains unchanged by human corrections.
 

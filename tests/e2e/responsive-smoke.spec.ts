@@ -23,12 +23,12 @@ test.describe("responsive receipt queue smoke", () => {
     await uploadReceipt(page);
     await extractButton(page, /Extract 1 file/i).click();
 
-    await expect(page.getByText(/FamilyMart · KRW 12000.00 · 2026-05-11/i)).toBeVisible();
+    await expect(page.getByText(/FamilyMart · KRW 12000 · 2026-05-11/i)).toBeVisible();
     await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
     await expect(page.getByRole("button", { name: "Export expenses CSV (1)" })).toBeVisible();
 
     await expandCurrentReceipt(page);
-    await expect(page.getByText("Extracted Items")).toBeVisible();
+    await page.getByText("Extracted items (1)", {exact:true}).click();
     await expect(page.getByText("Coffee")).toBeVisible();
   });
 });

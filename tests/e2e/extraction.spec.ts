@@ -21,7 +21,7 @@ test.describe("receipt extraction queue behavior", () => {
     await extractButton(page, /Extract 1 file/i).click();
     await expect(page.locator("article").getByText("Reading", {exact:true})).toBeVisible();
     await expect(page.getByText("0 of 1 processed", {exact:true})).toBeVisible();
-    await expect(page.getByText(/FamilyMart · KRW 12000.00 · 2026-05-11/i)).toBeVisible();
+    await expect(page.getByText(/FamilyMart · KRW 12000 · 2026-05-11/i)).toBeVisible();
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method()).toBe("POST");
@@ -32,12 +32,12 @@ test.describe("receipt extraction queue behavior", () => {
     {
       name: "high-confidence extraction",
       extraction: highConfidenceExtraction,
-      summary: /FamilyMart · KRW 12000.00 · 2026-05-11/i
+      summary: /FamilyMart · KRW 12000 · 2026-05-11/i
     },
     {
       name: "medium-confidence extraction",
       extraction: mediumConfidenceExtraction,
-      summary: /Tealive · MYR 8.90 · 2026-05-10/i
+      summary: /Tealive · MYR 8.9 · 2026-05-10/i
     }
   ]) {
     test(`marks ${name} as complete and downloadable`, async ({ page }) => {
@@ -98,7 +98,7 @@ test.describe("receipt extraction queue behavior", () => {
 
     await page.getByRole("button", { name: /Deselect second-receipt.png/i }).click();
     await extractButton(page, /Extract 1 file/i).click();
-    await expect(page.getByText(/FamilyMart · KRW 12000.00 · 2026-05-11/i)).toBeVisible();
+    await expect(page.getByText(/FamilyMart · KRW 12000 · 2026-05-11/i)).toBeVisible();
 
     await page.getByRole("button", { name: /Select second-receipt.png/i }).click();
     await extractButton(page, /Extract 1 file/i).click();

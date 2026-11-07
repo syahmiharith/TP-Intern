@@ -95,7 +95,7 @@ function formatSummary(item: ReceiptQueueItem) {
 
   const merchant = item.formValues.merchantName.trim() || "Unknown merchant";
   const currency = item.formValues.currency.trim().toUpperCase() || "—";
-  const total = item.formValues.totalAmount.trim() ? Number(item.formValues.totalAmount).toFixed(2) : "—";
+  const total = item.formValues.totalAmount.trim() || "—";
   const date = item.formValues.date.trim() || "—";
 
   return `${merchant} · ${currency} ${total} · ${date}`;

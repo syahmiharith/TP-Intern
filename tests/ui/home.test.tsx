@@ -128,8 +128,19 @@ describe("Home page receipt queue", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
-    expect(screen.getByText(/AEON Wellness · MYR 43.80 · 2026-05-12/i)).toBeInTheDocument();
+    expect(screen.getByText(/AEON Wellness · MYR 43.8 · 2026-05-12/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export expenses CSV (1)" })).toBeInTheDocument();
+  });
+
+  it("keeps valid three-decimal totals exact in collapsed reviewed summaries", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ data: { ...completeExtraction, currency: "KWD", totalAmount: 1.234 } }) })));
+    render(<Home />);
+    await uploadFiles([createImageFile("precision.png")]);
+    fireEvent.click(screen.getByRole("button", { name: "Extract 1 file" }));
+    await screen.findByText("AEON Wellness · KWD 1.234 · 2026-05-12");
+    fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
+    expect(screen.getByText("AEON Wellness · KWD 1.234 · 2026-05-12")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export expenses CSV (1)" })).toBeEnabled();
   });
 
   it("marks partial low-confidence extraction as needs review until manually fixed", async () => {

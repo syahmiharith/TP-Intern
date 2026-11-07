@@ -12,7 +12,7 @@ Use an icon alone for a familiar utility with a clear local scope. Keep a visibl
 | Failed or interrupted | Retry: icon and label on that receipt. | Keep the full error visible. Avoid an empty expense form. Successful receipts remain intact. |
 | Editing | Save changes: icon and label. Discard changes: text. | Show unsaved status; block review and export. Validation identifies and focuses the first invalid field. |
 | Saved, unreviewed | Mark reviewed: icon and label. | Show Needs review. Hide Save and Discard when there is no pending edit. |
-| Reviewed | No redundant commit controls | Show Reviewed even when expanded. Editing restores the pending-edit controls and blocks export. Model confidence remains separate. |
+| Reviewed | No redundant commit controls | Show Reviewed even when expanded. Editing restores the pending-edit controls and blocks export. Model confidence remains separate. Collapsed totals preserve the field string, including three-decimal currencies. |
 | Image inspection | Preview, rotate, zoom and close: labelled icons. Mobile image/form switch: icon and label. | Keep controls outside the scrollable image; allow keyboard panning, focus cycling and Escape with focus return. Collapse file metadata. Announce image loading; unreadable images show a recovery message and keep Close available. |
 | Export | One primary CSV action: icon and label with eligible count. JSON: secondary text button when eligible; its file icon is not self-explanatory. | Explain each selected exclusion on its card. Export starts a browser download; an in-flow status avoids obscuring fields. |
 | Recovery | Clear all: text. Main-app route: link. | Keep storage and legacy-origin errors actionable. Do not auto-redirect unreadable or unsupported saved work. |

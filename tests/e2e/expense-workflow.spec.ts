@@ -24,7 +24,7 @@ test("reviewed corrections survive refresh and CSV uses current reviewed values"
   const csv = await readFile((await file.path())!, "utf8");
   expect(csv).toContain('"28.00"');
   expect(csv).toContain('"Sample stationery.png"');
-  await expect(page.getByText(/Model confidence low/)).toBeVisible();
+  await expect(page.getByText(/^low confidence$/i)).toBeVisible();
   await page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1).fill("30.00");
   await page.getByRole("button", { name: "Discard changes", exact: true }).nth(1).click();
   await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();
@@ -49,7 +49,7 @@ for (const width of [375, 768, 1280]) {
 test("deletion persists and unavailable storage is explained", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Try two sample receipts" }).click();
-  await page.getByRole("button", { name: "Delete batch / Clear saved data" }).click();
+  await page.getByRole("button", { name: "Clear saved receipts" }).click();
   await page.waitForTimeout(300);
   await page.reload();
   await expect(page.getByText("Upload receipt files")).toBeVisible();

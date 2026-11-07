@@ -32,7 +32,7 @@ for(const state of ['pending','extracting','unsupported','branded'] as const){
    if(state==='extracting') await expect(page.getByText('Extraction interrupted. Retry when ready.',{exact:true})).toBeVisible();
   }
   expect(new URL(page.url()).origin).toBe(entry);
-  await page.getByRole('button',{name:'Delete batch / Clear saved data'}).click();
+  await page.getByRole('button',{name:'Clear saved receipts'}).click();
   await expect(page).toHaveURL(branded+'/');
   await expect(page.getByRole('button',{name:'Try two sample receipts'})).toBeEnabled();
  });

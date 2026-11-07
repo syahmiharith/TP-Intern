@@ -1018,7 +1018,7 @@ export default function Home() {
 
         <div className="flex flex-wrap items-center gap-2">
         <button aria-label="Try two sample receipts" title="Try two sample receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}><FlaskConical className="mr-2 inline h-4 w-4" aria-hidden="true" />Samples</button>
-        {(items.length > 0 || errorMessage) && <button aria-label="Clear saved receipts" title="Clear saved receipts" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}
+        {(items.length > 0 || errorMessage) && <button aria-label="Clear all saved receipts" title="Clear all receipts saved in this browser" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}>Clear all</button>}
         {addingFiles && <p role="status">Checking selected receipts…</p>}
         {busy && <button onClick={() => { stopRequested.current = true; }}><Square className="mr-2 inline h-4 w-4" aria-hidden="true" />Stop remaining work</button>}
         </div>

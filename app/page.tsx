@@ -242,6 +242,7 @@ function AddFileButton({ canAddMore, onFiles }: { canAddMore: boolean; onFiles: 
 function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClose: () => void }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [imageState, setImageState] = useState<"loading" | "ready" | "failed">("loading");
   const dialogRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
@@ -296,8 +297,10 @@ function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClos
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
           <h2 id="receipt-preview-title" className="text-lg font-bold text-slate-950">Receipt Preview</h2>
           <div className="ml-auto flex items-center gap-1">
+          {imageState !== "failed" && <>
           <IconButton label="Rotate clockwise" onClick={() => setRotation((value) => value + 90)}><RotateCw className="h-4 w-4" aria-hidden="true" /></IconButton>
           <IconButton label={zoom === 1 ? "Zoom in" : "Zoom out"} onClick={() => { setZoom((value) => value === 1 ? 2 : 1); viewportRef.current?.scrollTo(0, 0); }}>{zoom === 1 ? <ZoomIn className="h-4 w-4" aria-hidden="true" /> : <ZoomOut className="h-4 w-4" aria-hidden="true" />}</IconButton>
+          </>}
           <IconButton label="Close preview" onClick={onClose}>
             <X className="h-4 w-4" aria-hidden="true" />
           </IconButton>
@@ -307,7 +310,8 @@ function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClos
           <div ref={viewportRef} role="region" aria-label="Receipt image viewer" tabIndex={0} className="h-[50vh] max-h-[32rem] overflow-auto rounded-lg bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
             <div className="relative" style={{ width: Math.max(viewportSize.width, orientedWidth * fit * zoom), height: Math.max(viewportSize.height, orientedHeight * fit * zoom) }}>
               {/* eslint-disable-next-line @next/next/no-img-element -- Blob preview URLs cannot be optimized by next/image. */}
-              <img src={item.previewUrl} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} style={{ width: imageSize.width * fit * zoom, height: imageSize.height * fit * zoom, transform: `translate(-50%, -50%) rotate(${rotation}deg)` }} alt={`Preview of ${item.file.name}`} className="absolute left-1/2 top-1/2 max-w-none rounded object-contain" />
+              <img src={item.previewUrl} onLoad={(event) => { setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); setImageState("ready"); }} onError={() => { setImageState("failed"); dialogRef.current?.querySelector<HTMLButtonElement>('[aria-label="Close preview"]')?.focus(); }} style={{ width: imageSize.width * fit * zoom, height: imageSize.height * fit * zoom, transform: `translate(-50%, -50%) rotate(${rotation}deg)` }} alt={`Preview of ${item.file.name}`} className={clsx("absolute left-1/2 top-1/2 max-w-none rounded object-contain", imageState !== "ready" && "invisible")} />
+              {imageState !== "ready" && <p role={imageState === "failed" ? "alert" : "status"} className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-600">{imageState === "failed" ? "This image could not be displayed. Close the preview and try another file." : "Loading image…"}</p>}
             </div>
           </div>
           <details className="mt-3 text-sm">

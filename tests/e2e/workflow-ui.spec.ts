@@ -84,3 +84,15 @@ test('queue counts reflect completed requests and stopping waits for the current
  await expect(page.locator('article').getByText('Queued',{exact:true})).toHaveCount(2);
  expect(calls).toBe(1);
 });
+
+
+test('an unreadable image keeps an actionable preview and keyboard exit',async({page})=>{
+ await gotoHome(page);await uploadReceipts(page,[{name:'unreadable.png',mimeType:'image/png',buffer:Buffer.from('not an image')}]);
+ await page.getByRole('button',{name:'Preview unreadable.png',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog.getByRole('alert')).toHaveText('This image could not be displayed. Close the preview and try another file.');
+ await expect(dialog.getByRole('button',{name:'Zoom in',exact:true})).toHaveCount(0);
+ await expect(dialog.getByRole('button',{name:'Close preview',exact:true})).toBeFocused();
+ await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Preview unreadable.png',exact:true})).toBeFocused();
+});

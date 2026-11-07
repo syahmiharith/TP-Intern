@@ -115,7 +115,7 @@ describe("Home page receipt queue", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
     expect(screen.getByText(/AEON Wellness · MYR 43.80 · 2026-05-12/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Download result for aeon-receipt.png/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export expenses CSV (1)" })).toBeInTheDocument();
   });
 
   it("marks partial low-confidence extraction as needs review until manually fixed", async () => {
@@ -132,7 +132,7 @@ describe("Home page receipt queue", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Extract 1 file/i }));
     expect(await screen.findByText(/Needs review/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Download result/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Export expenses CSV (1)" })).not.toBeInTheDocument();
 
     const reviewRow = screen.getByText("blurry-receipt.png").closest("article");
     expect(reviewRow).not.toBeNull();
@@ -149,7 +149,7 @@ describe("Home page receipt queue", () => {
     fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
 
     fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
-    expect(screen.getByRole("button", { name: /Download result for blurry-receipt.png/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export expenses CSV (1)" })).toBeInTheDocument();
   });
 
   it("opens the preview modal from the row icon", async () => {

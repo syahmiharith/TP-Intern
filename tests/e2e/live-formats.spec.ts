@@ -27,7 +27,7 @@ test("real PNG JPEG and WebP receipts complete one reviewed expense batch", asyn
   await page.locator('input[type="file"]').first().setInputFiles(files);
   await page.getByRole("button", { name: "Extract 3 files", exact: true }).click();
   await expect(page.getByRole("button", { name: "Stop remaining work", exact: true })).toBeHidden({ timeout: 150000 });
-  await expect(page.getByText(/Eligible exports 0\. 3 of 3 extracted\./)).toBeVisible();
+  await expect(page.locator("article").getByText(/Model confidence/)).toHaveCount(3);
   for (const [index, file] of files.entries()) {
     const row = page.locator("article").filter({ has: page.getByText(file.name, { exact: true }) });
     await row.getByRole("button", { name: `Expand ${file.name}`, exact: true }).click();

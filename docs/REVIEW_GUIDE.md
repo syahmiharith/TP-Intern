@@ -1,53 +1,23 @@
-# Review Guide
+# Receipt-to-Form review guide
 
-Quick reviewer path for Receipt-to-Form.
+Main entry: https://receipt-to-form-syahmiharith.vercel.app.
 
-## What To Review First
+## Product journey
 
-1. Run the app locally using the commands below. See the README for the existing hosted demo.
-2. Upload one to five receipt images.
-3. Select the files to process and click **Extract**.
-4. Open the preview modal to inspect the uploaded image.
-5. Expand a completed or needs-review row.
-6. For `Needs review`, compare the inline receipt preview with the editable fields and fix missing values.
-7. Confirm complete rows show a download icon.
-8. Download one result or selected complete results as JSON.
+Upload up to five supported images, or load optional samples. All receipts use one queue, editor and storage path. Extract uploads, compare the image with the fields, correct them, Save changes, then Mark reviewed inside the receipt card. Discard changes restores the saved revision and its review status.
 
-## Commands
+Use the batch toolbar's single CSV export action for eligible selected receipts. Each selected exclusion is explained on its card. JSON is secondary provenance output. Editing a reviewed receipt immediately blocks its export; refresh must restore that pending edit. Original model confidence remains unchanged by human corrections.
 
-```bash
-npm install
-npm run dev
-```
+## Checks
 
-```bash
-npm run ci
-npm run test:e2e
-npm run test:e2e:live
-```
+- Correct the sample stationery total from 23.00 to 28.00, save and review; inspect the downloaded CSV.
+- Edit a reviewed total, verify export blocks, refresh, restore the pending correction, save and review again. Confirm CSV, receipt ID and original confidence.
+- Test Discard separately and verify reviewed export eligibility returns.
+- Mix samples and an uploaded synthetic receipt in the same queue.
+- Exercise keyboard preview and card actions, mobile image/form switching, validation, retries and stopping remaining work.
+- Check 375px, tablet and desktop widths; the toolbar must not obscure fields or receipt actions.
+- Verify an empty legacy origin redirects only after storage loads. Existing legacy receipts, unknown schemas and storage errors must stay recoverable. Explicit clearing must complete before navigation.
 
-## Environment
+## Engineering checks
 
-```bash
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-```
-
-`GEMINI_API_KEY` is required for real extraction. `GEMINI_MODEL` is optional.
-
-## Engineering Highlights
-
-- Uses a server-side API route so the Gemini key is not exposed to the browser.
-- Handles file type and file size validation on the client and API boundary.
-- Supports batch queue behavior without adding unnecessary backend complexity.
-- Treats AI extraction as a draft and keeps human review in the loop.
-- Distinguishes failed extraction from partial extraction.
-- Requires manual correction for incomplete AI fields before download.
-- Shows inline receipt preview during review to reduce user friction.
-- Validates required receipt fields before a result becomes downloadable.
-- Separates deterministic CI tests from live AI validation.
-- Documents deployment, testing, and known MVP limits.
-
-## Known Scope
-
-The app intentionally keeps queue state in the browser and uses a single extraction API route. Durable persistence, authentication, PDF support, real Google Drive upload, URL upload, and accounting-system integrations are outside this portfolio version.
+Run lint, TypeScript, unit/API/UI tests, Playwright and production build. Deterministic tests mock the provider; real extraction is separately enabled with RUN_LIVE_GEMINI_E2E=1. Shared rate/budget limits and provider quota still apply. Never upload real expense data for showcase testing.

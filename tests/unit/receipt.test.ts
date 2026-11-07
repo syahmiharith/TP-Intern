@@ -269,3 +269,15 @@ describe("validateReceiptForm", () => {
     expect(validateReceiptForm(validForm({ currency })).currency).toBeDefined();
   });
 });
+
+describe("current ISO currency support", () => {
+  it("accepts current codes even before the runtime currency catalogue catches up", () => {
+    expect(validateReceiptForm(validForm({ currency: "XAD" }))).toEqual({});
+  });
+  it("uses current ISO minor units for newly introduced codes", () => {
+    expect(validateReceiptForm(validForm({ currency: "XAD", totalAmount: "12.501" })).totalAmount).toBe("Too many decimal places for this currency.");
+  });
+  it("keeps previously saved historical currency values reviewable", () => {
+    expect(validateReceiptForm(validForm({ currency: "BGN" }))).toEqual({});
+  });
+});

@@ -1,5 +1,6 @@
 import {expect,test,type Route} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
+import {currentCurrencies} from '../../lib/currencies';
 import {gotoHome,highConfidenceExtraction,uploadReceipts} from './support/receipt';
 
 for(const width of [375,768,1280]){
@@ -74,8 +75,8 @@ test('queue counts reflect completed requests and stopping waits for the current
  await gotoHome(page);await uploadReceipts(page,[0,1,2].map(i=>({name:`queue-${i}.png`,mimeType:'image/png',buffer:Buffer.from(`queue-${i}`)})));
  await page.getByRole('button',{name:'Extract 3 files',exact:true}).click();
  await expect(page.getByText('0 of 3 processed',{exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'Extract',exact:true})).toBeDisabled();
- await expect(page.getByRole('button',{name:'Extract',exact:true})).toHaveCSS('opacity','0.4');
+ await expect(page.getByRole('button',{name:'Extracting…',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Extracting…',exact:true})).toHaveCSS('opacity','1');
  await expect(page.getByRole('button',{name:'Delete queue-0.png',exact:true})).toBeDisabled();
  await page.getByRole('button',{name:'Stop queue after current receipt',exact:true}).click();
  await expect(page.getByRole('button',{name:'Stopping after current receipt',exact:true})).toBeDisabled();
@@ -98,14 +99,16 @@ test('an unreadable image keeps an actionable preview and keyboard exit',async({
 });
 
 for (const width of [375, 768, 1280]) {
- test(`currency search, notes and footer placement at ${width}px`, async ({page}) => {
+ test(`currency search, immutable notes and footer placement at ${width}px`, async ({page}) => {
   await page.setViewportSize({width,height:900});
   await gotoHome(page);
   await page.getByRole('button',{name:'Try samples',exact:true}).click();
   const row=page.locator('article').first();
   const currency=row.getByRole('combobox',{name:'Currency',exact:true});
   await currency.click();
-  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option')).toHaveCount(await page.evaluate(()=>Intl.supportedValuesOf('currency').length));
+  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option')).toHaveCount(currentCurrencies.length);
+  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option',{name:/^BGN /})).toHaveCount(0);
+  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option',{name:/^XCG /})).toHaveCount(1);
   await currency.fill('Malaysian');
   await expect(row.getByRole('option',{name:'MYR Malaysian Ringgit'})).toBeVisible();
   await currency.press('ArrowDown');
@@ -121,22 +124,24 @@ for (const width of [375, 768, 1280]) {
   await currency.click();
   await currency.fill('USD');
   await currency.press('Enter');
-  const notes=row.getByLabel('Notes',{exact:true});
-  await notes.fill('');
-  await notes.pressSequentially('Lunch with client',{delay:10});
-  await expect(notes).toHaveValue('Lunch with client');
+  const notes=row.getByRole('list',{name:'Notes',exact:true});
+  await expect(notes.getByRole('listitem')).toHaveText(['Client meeting']);
+  await expect(row.getByRole('textbox',{name:'Notes',exact:true})).toHaveCount(0);
+  await row.getByLabel('Total Amount',{exact:true}).fill('13.50');
   await expect(row.getByTestId('receipt-status')).toHaveText('Unsaved changes');
   await expect(row.getByText('Extraction confidence high',{exact:true})).toBeVisible();
-  await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{const open=indexedDB.open('receipt-expenses');open.onsuccess=()=>{const db=open.result;const tx=db.transaction('batches','readonly');const get=tx.objectStore('batches').get('current');get.onsuccess=()=>resolve(get.result.items[0].formValues.notes);tx.oncomplete=()=>db.close();};}))).toBe('Lunch with client');
+  await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{const open=indexedDB.open('receipt-expenses');open.onsuccess=()=>{const db=open.result;const tx=db.transaction('batches','readonly');const get=tx.objectStore('batches').get('current');get.onsuccess=()=>resolve(get.result.items[0].formValues.totalAmount);tx.oncomplete=()=>db.close();};}))).toBe('13.50');
   await page.reload();
-  await expect(notes).toHaveValue('Lunch with client');
+  await expect(notes.getByRole('listitem')).toHaveText(['Client meeting']);
+  await expect(row.getByLabel('Total Amount',{exact:true})).toHaveValue('13.50');
   await row.getByRole('button',{name:'Save changes',exact:true}).click();
   await row.getByRole('button',{name:'Mark reviewed',exact:true}).click();
   await expect(row.getByTestId('receipt-status')).toHaveText('Reviewed');
   const pending=page.waitForEvent('download');
   await page.getByRole('button',{name:'Export expenses CSV (1)',exact:true}).click();
   const csv=await readFile((await (await pending).path())!,'utf8');
-  expect(csv).toContain('"Lunch with client"');
+  expect(csv).toContain('"Client meeting"');
+  expect(csv).toContain('"13.50"');
   expect(csv).toContain('"USD"');
   const toolbar=page.getByLabel('Batch actions',{exact:true});
   const footer=page.locator('footer');
@@ -159,4 +164,69 @@ test('long filenames remain within a narrow receipt card',async({page})=>{
  await page.getByRole('button',{name:`Expand ${name}`,exact:true}).click();
  await expect(page.getByRole('combobox',{name:'Currency',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('bottom border tracks pending extraction without a fabricated percentage',async({page})=>{
+ let held:Route|undefined;
+ await page.route('**/api/extract-receipt',route=>{held=route;});
+ await gotoHome(page);
+ await uploadReceipts(page,[{name:'pending.png',mimeType:'image/png',buffer:Buffer.from('synthetic pending receipt')}]);
+ await page.getByRole('button',{name:'Extract 1 file',exact:true}).click();
+ const card=page.locator('article');
+ const progress=card.getByRole('progressbar',{name:'Extracting pending.png',exact:true});
+ await expect(card.getByTestId('receipt-status')).toHaveText('Extracting');
+ await expect(progress).toBeVisible();
+ await expect(card).toHaveAttribute('aria-busy','true');
+ expect(await progress.getAttribute('aria-valuenow')).toBeNull();
+ const cardBox=(await card.boundingBox())!;
+ const barBox=(await progress.boundingBox())!;
+ expect(Math.abs(cardBox.y+cardBox.height-barBox.y-barBox.height)).toBeLessThan(2);
+ expect(Math.abs(cardBox.width-barBox.width)).toBeLessThan(3);
+ const segment=progress.locator('span');
+ const start=await segment.evaluate(el=>getComputedStyle(el).transform);
+ await expect.poll(()=>segment.evaluate(el=>getComputedStyle(el).transform)).not.toBe(start);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await expect(segment).toHaveCSS('animation-name','none');
+ await expect(progress).toBeVisible();
+ await expect.poll(()=>Boolean(held)).toBe(true);
+ await held!.fulfill({status:503,json:{error:'Extraction unavailable. Try again.'}});
+ await expect(progress).toHaveCount(0);
+ await expect(card.getByTestId('receipt-status')).toHaveText('Failed');
+ held=undefined;
+ await card.getByRole('button',{name:'Retry',exact:true}).click();
+ await expect(progress).toBeVisible();
+ await expect.poll(()=>Boolean(held)).toBe(true);
+ await held!.fulfill({json:{data:highConfidenceExtraction}});
+ await expect(progress).toHaveCount(0);
+ await expect(card).toHaveAttribute('aria-busy','false');
+ await expect(card.getByRole('button',{name:'Expand pending.png',exact:true})).toBeVisible();
+ await expect(card.getByRole('table',{name:'Extracted items'})).toBeVisible();
+ await expect(card.getByRole('cell',{name:'Coffee',exact:true})).toBeVisible();
+ await expect(card.getByRole('list',{name:'Notes',exact:true})).toContainText('Clear receipt image.');
+ await expect(card.getByRole('textbox',{name:'Notes',exact:true})).toHaveCount(0);
+});
+
+test('review controls give visible feedback and retain keyboard focus',async({page})=>{
+ await gotoHome(page);
+ await page.getByRole('button',{name:'Try samples',exact:true}).click();
+ const card=page.locator('article').first();
+ const preview=card.getByRole('button',{name:'Preview Sample cafe.png',exact:true});
+ await preview.hover();
+ await expect(preview).toHaveCSS('filter','brightness(0.96)');
+ await preview.focus();
+ await expect(preview).toHaveCSS('outline-style','solid');
+ const amount=card.getByLabel('Total Amount',{exact:true});
+ await amount.fill('14.00');
+ await card.getByRole('button',{name:'Save changes',exact:true}).click();
+ await expect(page.getByText('Changes saved.',{exact:true})).toBeVisible();
+ await expect(card.getByRole('button',{name:'Mark reviewed',exact:true})).toBeFocused();
+ await page.keyboard.press('Enter');
+ await expect(page.getByText('Receipt reviewed.',{exact:true})).toBeVisible();
+ await expect(card.getByTestId('receipt-status')).toBeFocused();
+ await amount.fill('17.00');
+ await card.getByRole('button',{name:'Discard changes',exact:true}).click();
+ await expect(page.getByText('Changes discarded.',{exact:true})).toBeVisible();
+ await expect(card.getByTestId('receipt-status')).toBeFocused();
+ await expect(amount).toHaveValue('14.00');
+ await expect(card.getByTestId('receipt-status')).toHaveText('Reviewed');
 });

@@ -7,6 +7,14 @@ import { flushSync } from "react-dom";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   AlertCircle,
+  Save,
+  FileText,
+  RotateCcw,
+  Download,
+  FileJson,
+  FlaskConical,
+  Square,
+  Sparkles,
   Check,
   ChevronDown,
   ChevronUp,
@@ -311,7 +319,6 @@ function ExpandedReceiptDetails({
   item: ReceiptQueueItem;
   onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
 }) {
-  const reviewRequired = !isCompleteItem(item);
   const [showImage, setShowImage] = useState(false);
 
   useEffect(() => {
@@ -320,11 +327,9 @@ function ExpandedReceiptDetails({
 
   return (
     <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2.5">
-      <button className="lg:hidden" aria-pressed={showImage} onClick={() => setShowImage((value) => !value)}>{showImage ? "Show form" : "Show receipt image"}</button>
-      <h3 className="text-sm font-bold text-slate-950">{reviewRequired ? "Review Required" : "Receipt Details"}</h3>
-      {reviewRequired && (item.extraction?.confidence === "low" || Object.keys(item.errors).length > 0) ? (
-        <p className="mt-0.5 text-xs text-slate-600">Some fields could not be extracted confidently. Please check manually.</p>
-      ) : null}
+      <button className="lg:hidden" aria-pressed={showImage} onClick={() => setShowImage((value) => !value)}>{showImage ? <FileText className="mr-1 inline h-4 w-4" aria-hidden="true" /> : <Eye className="mr-1 inline h-4 w-4" aria-hidden="true" />}{showImage ? "Show form" : "Show receipt image"}</button>
+      <h3 className="text-sm font-bold text-slate-950">Receipt Details</h3>
+
 
       <div className={clsx("mt-2 grid gap-3", "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
         <div className={clsx("lg:block", showImage && "hidden")}>
@@ -362,11 +367,11 @@ function ExpandedReceiptDetails({
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <div>
-              <p className="text-xs font-semibold text-slate-700">AI Confidence</p>
+              <p className="text-xs font-semibold text-slate-700">Model</p>
               <p className="mt-1 text-sm capitalize text-slate-600">{item.extraction?.confidence ?? "Not extracted"} confidence</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-700">AI Notes</p>
+            {item.extraction?.notes.length && item.extraction.notes.join("\n") !== item.formValues.notes ? <div>
+              <p className="text-xs font-semibold text-slate-700">Original notes</p>
               {item.extraction?.notes.length ? (
                 <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
                   {item.extraction.notes.map((note, index) => (
@@ -374,9 +379,9 @@ function ExpandedReceiptDetails({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-1 text-sm text-slate-500">No major uncertainty detected.</p>
+                <p className="mt-1 text-sm text-slate-500">No notes.</p>
               )}
-            </div>
+            </div> : null}
           </div>
 
           <div className="mt-3 space-y-1">
@@ -390,7 +395,7 @@ function ExpandedReceiptDetails({
             />
           </div>
 
-          <div className="mt-3">
+          {item.extraction?.items.length ? <div className="mt-3">
             <p className="mb-1.5 text-xs font-semibold text-slate-700">Extracted Items</p>
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               <table className="w-full text-left text-sm">
@@ -420,8 +425,7 @@ function ExpandedReceiptDetails({
                 </tbody>
               </table>
             </div>
-          </div>
-
+          </div> : null}
 
         </div>
 
@@ -569,8 +573,8 @@ function ReceiptQueueItemRow({
             <p className="min-w-0 truncate text-sm font-bold text-slate-950" title={item.file.name}>
               {item.file.name}
             </p>
-            <span className="text-xs font-semibold text-slate-500">{statusLabel(item)}</span>
-            {canShowProcessedActions && item.formValues.receiptType ? (
+            <span className="text-xs font-semibold text-slate-500">{item.expanded && item.status === "extracted" ? "Needs review" : statusLabel(item)}</span>
+            {canShowProcessedActions && !item.expanded && item.formValues.receiptType ? (
               <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                 {item.formValues.receiptType}
               </span>
@@ -609,12 +613,11 @@ function ReceiptQueueItemRow({
 
       {item.selected && !item.extraction && <p className="border-t border-slate-100 px-4 py-2 text-sm text-slate-600">Excluded from export — {item.status === "failed" ? "retry extraction, then review" : item.status === "extracting" ? "extraction is in progress" : "extract this receipt, then review"}.</p>}
       {item.extraction && <div className="border-t border-slate-200 px-4 py-3 space-y-2 text-sm">
-        <p>Model confidence {item.extraction.confidence} · {complete ? "Reviewed" : JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "Unsaved changes" : "Saved · review required"}</p>
         {item.selected && !complete && <p className="text-slate-600">Excluded from export — {JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "save or discard changes" : "correct errors and mark reviewed"}.</p>}
-        <div className="flex flex-wrap gap-2 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40">
-          <button onClick={() => onSave(item.id)}>Save changes</button>
-          <button onClick={() => onDiscard(item.id)}>Discard changes</button>
-          <button disabled={JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)} onClick={() => onReview(item.id)}>Mark reviewed</button>
+        <div className="flex flex-wrap gap-2 [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40">
+          <button aria-label="Save changes" title="Save changes" onClick={() => onSave(item.id)}><Save className="h-4 w-4" aria-hidden="true" /></button>
+          <button aria-label="Discard changes" title="Discard changes" onClick={() => onDiscard(item.id)}><RotateCcw className="h-4 w-4" aria-hidden="true" /></button>
+          <button disabled={JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)} onClick={() => onReview(item.id)}><Check className="mr-2 inline h-4 w-4" aria-hidden="true" />Mark reviewed</button>
         </div>
       </div>}
 
@@ -657,7 +660,7 @@ function FloatingBatchFooter({
   const hasMultipleFiles = fileCount > 1;
 
   return (
-    <div className="mx-auto mt-5 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
+    <div className="mx-auto mt-5 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {hasMultipleFiles ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -665,7 +668,7 @@ function FloatingBatchFooter({
               {fileCount} / {maxFiles} files · {selectedCount} selected
             </p>
             <button type="button" onClick={onSelectToggle} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 hover:shadow-[0_0_0_3px_rgba(59,130,246,0.12)] focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {selectedCount === fileCount ? "Deselect all" : "Select all"}
+              <Check className="mr-1 inline h-4 w-4" aria-hidden="true" />{selectedCount === fileCount ? "Deselect all" : "Select all"}
             </button>
           </div>
         ) : (
@@ -675,15 +678,16 @@ function FloatingBatchFooter({
           <span className="text-sm">{eligibleCount} eligible</span>
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
             <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.14)] focus:outline-none focus:ring-2 focus:ring-emerald-500" title="Only current reviewed receipts can be exported.">
-              Export expenses CSV ({eligibleCount})
+              <Download className="mr-2 inline h-4 w-4" aria-hidden="true" />Export expenses CSV ({eligibleCount})
             </button>
-          <button disabled={!canDownloadSelected} onClick={onJson} className="rounded-lg border px-3 py-2">Export JSON</button>
+          <button aria-label="Export JSON" title="Export provenance JSON" disabled={!canDownloadSelected} onClick={onJson} className="min-h-11 min-w-11 rounded-lg border px-3 py-2"><FileJson className="h-4 w-4" aria-hidden="true" /></button>
           <button
             type="button"
             disabled={!canExtractSelected}
             onClick={onExtract}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.16)] focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:hover:shadow-none"
           >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
             {canExtractSelected ? `Extract ${extractCount} ${extractCount === 1 ? "file" : "files"}` : "Extract"}
           </button>
         </div>
@@ -986,13 +990,13 @@ export default function Home() {
   return (
     <>
       <AppHeader />
-      <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
+      <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
         <h1 className="text-2xl font-bold">Turn receipts into expense records</h1>
-        <p>JPG, PNG or WebP · 5 MB each · up to five receipts. Live extraction sends images to the AI provider. Work is saved on this device for seven days after editing. Browser storage is a convenience and may be cleared by your browser.</p>
-        <button disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}>Try two sample receipts</button>{" · "}
-        <button disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}>Delete batch / Clear saved data</button>
+        <p>Live extraction sends images to Gemini. Receipts stay on this device for 7 days after editing; browser storage may be cleared.</p>
+        <button aria-label="Try two sample receipts" title="Try two sample receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}><FlaskConical className="mr-2 inline h-4 w-4" aria-hidden="true" />Samples</button>
+        <button aria-label="Clear saved receipts" title="Clear saved receipts" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
         {addingFiles && <p role="status">Checking selected receipts…</p>}
-        {busy && <button onClick={() => { stopRequested.current = true; }}>Stop remaining work</button>}
+        {busy && <button onClick={() => { stopRequested.current = true; }}><Square className="mr-2 inline h-4 w-4" aria-hidden="true" />Stop remaining work</button>}
         {legacy && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3">You are recovering receipts saved at the old address. Finish reviewing and export them here. Saved work stays here until cleared or expired. <a className="underline font-semibold" href="https://receipt-to-form-syahmiharith.vercel.app/">Open the main app</a></div>}
       </section>
       <main className="min-h-[calc(100vh-151px)] px-4 pb-28 pt-5 sm:px-6 lg:px-8">

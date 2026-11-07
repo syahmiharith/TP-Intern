@@ -151,10 +151,10 @@ test("pending uploads cannot race sample loading or batch clearing", async ({ pa
   await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled();
   await page.locator('input[type="file"]').first().setInputFiles(files(5));
   expect(await page.getByRole("button", { name: "Try two sample receipts" }).isDisabled()).toBe(true);
-  expect(await page.getByRole("button", { name: "Delete batch / Clear saved data" }).isDisabled()).toBe(true);
+  expect(await page.getByRole("button", { name: "Clear saved receipts" }).isDisabled()).toBe(true);
   await expect(page.locator("article")).toHaveCount(5);
-  await expect(page.getByRole("button", { name: "Delete batch / Clear saved data" })).toBeEnabled();
-  await page.getByRole("button", { name: "Delete batch / Clear saved data" }).click();
+  await expect(page.getByRole("button", { name: "Clear saved receipts" })).toBeEnabled();
+  await page.getByRole("button", { name: "Clear saved receipts" }).click();
   await expect.poll(async () => (await storedBatch(page)).items.length).toBe(0);
   await page.reload();
   await expect(page.getByText("Upload receipt files")).toBeVisible();
@@ -174,7 +174,7 @@ test("unsupported saved schemas are preserved until the user clears them", async
   await page.reload();
   await expect(page.locator('main [role="alert"]')).toContainText("Saved data could not be opened");
   expect((await storedBatch(page)).schemaVersion).toBe(999);
-  await page.getByRole("button", { name: "Delete batch / Clear saved data" }).click();
+  await page.getByRole("button", { name: "Clear saved receipts" }).click();
   await expect(page.locator('main [role="alert"]')).toBeHidden();
   await expect.poll(async () => (await storedBatch(page)).schemaVersion).toBe(2);
   await page.reload();
@@ -198,7 +198,7 @@ test("storage quota errors keep in-memory reviewed values exportable and recover
   await page.getByRole("button", { name: "Export expenses CSV (1)", exact: true }).click();
   expect(await readFile((await (await pending).path())!, "utf8")).toContain("12.5");
   await page.evaluate(() => localStorage.removeItem("runtime-quota"));
-  await page.getByRole("button", { name: "Delete batch / Clear saved data" }).click();
+  await page.getByRole("button", { name: "Clear saved receipts" }).click();
   await expect(page.locator('main [role="alert"]')).toBeHidden();
   await expect.poll(async () => (await storedBatch(page)).items.length).toBe(0);
 });
@@ -285,7 +285,7 @@ test("deleting receipts and clearing the batch remove stored source images", asy
   await expect.poll(() => storedImageCount(page)).toBe(2);
   await page.getByRole("button", { name: "Delete Sample cafe.png", exact: true }).click();
   await expect.poll(() => storedImageCount(page)).toBe(1);
-  await page.getByRole("button", { name: "Delete batch / Clear saved data" }).click();
+  await page.getByRole("button", { name: "Clear saved receipts" }).click();
   await expect.poll(() => storedImageCount(page)).toBe(0);
   await page.reload();
   await expect(page.getByText("Upload receipt files")).toBeVisible();

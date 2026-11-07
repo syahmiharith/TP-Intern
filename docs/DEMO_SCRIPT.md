@@ -1,33 +1,15 @@
-# Demo Script
+# Receipt-to-Form demonstration
 
-Target length: 60 to 90 seconds.
+Open https://receipt-to-form-syahmiharith.vercel.app.
 
-## Opening
+1. Point out upload as the main action and the optional sample button. Live extraction sends images to Gemini.
+2. Choose **Try two sample receipts**. Both receipts appear in the existing queue. The stationery image shows USD 28.00 while its initial extraction says 23.00.
+3. Compare the stationery image with its form and correct the total to 28.00.
+4. Use **Save changes**, then **Mark reviewed**, within that receipt card. Original low model confidence stays visible independently.
+5. Change the reviewed total again. The card shows unsaved changes and the batch CSV export is blocked for that receipt.
+6. Refresh, verify the pending correction returns, then use **Discard changes** to restore the saved reviewed 28.00 revision.
+7. Use the batch toolbar's single **Export expenses CSV** action. Open the file and check total, receipt ID, source filename and review timestamp. Secondary **Export JSON** includes original extraction and reviewed values.
+8. Optionally upload a synthetic receipt into the same queue and extract it. Explain visible retry/stop controls if the provider is unavailable.
+9. On a narrow screen, switch between form and image and use the same card actions. Preview supports keyboard focus, Escape, zoom and rotation.
 
-Receipt-to-Form is an AI-assisted receipt extraction and review app. It uses Gemini Vision to extract structured receipt data, then keeps a human review step before any result can be downloaded.
-
-## Walkthrough
-
-1. Open the app and point out the receipt extraction queue.
-2. Upload two receipt images to show batch handling.
-3. Select the files and click **Extract**.
-4. Show item-level progress and status changes.
-5. Open a receipt preview to confirm the uploaded image.
-6. Expand a complete result and show merchant, receipt type, currency, total, date, confidence, notes, and line items.
-7. Show the download icon appears only for complete results.
-8. Show a `Needs review` result if available.
-9. Expand it and use the inline receipt preview beside the form to manually fix missing fields.
-10. Save changes and show the row becomes `Edited` with a download action.
-11. Download selected complete JSON results.
-
-## Technical Talking Points
-
-- The Gemini API key is protected behind a server-side Next.js route.
-- The app validates file type, file size, model output, and required fields.
-- Low-confidence or incomplete extraction does not become downloadable until reviewed.
-- Default automated tests mock Gemini, so CI is deterministic and does not depend on quota or model uptime.
-- A separate live Gemini smoke test validates the real integration before final demo recording.
-
-## Closing
-
-The goal is not only to call an AI API. The goal is to make an AI-assisted workflow reliable: validate inputs, normalize model output, handle uncertainty, protect secrets, support manual correction, and test the important paths.
+Saved receipts are local to this address/device and expire seven days after editing. The legacy address retains existing saved receipts for recovery; finish and export there before clearing and continuing to the branded app. No participant outcomes are claimed by this demonstration.

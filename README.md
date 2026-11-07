@@ -1,6 +1,6 @@
 # Receipt-to-Form
 
-Gemini-powered receipt extraction and human-review web app. The app turns receipt images into structured, reviewable data through a CloudConvert-style processing queue: upload receipts, extract selected files, review uncertain fields, and download only complete JSON outputs.
+Gemini-powered receipt extraction and human-review web app. The app turns receipt images into structured, reviewable data through a CloudConvert-style processing queue: upload receipts, extract selected files, review uncertain fields, and export reviewed expenses as CSV with secondary provenance JSON.
 
 **Run the app:** follow [Getting Started](#getting-started).
 
@@ -14,12 +14,13 @@ Gemini-powered receipt extraction and human-review web app. The app turns receip
 
 ## Quick Path
 
-1. Start the local app or open the existing hosted demo.
-2. Upload one to five JPG, PNG, or WEBP receipt images.
-3. Select the files to process and click **Extract**.
-4. Preview receipts, review extracted fields, and fix any `Needs review` result using the inline receipt preview.
-5. Confirm complete rows show a download action.
-6. Download per-receipt JSON or selected complete JSON results.
+1. Upload one to five JPG, PNG or WebP receipts, or choose the optional samples.
+2. Extract uploaded receipts and compare each result with its image.
+3. Correct fields, then use **Save changes** and **Mark reviewed** within the receipt card.
+4. Use the batch toolbar's **Export expenses CSV** to download the reviewed selected receipts. **Export JSON** retains original model provenance.
+5. Editing blocks export until you save and review again. **Discard changes** restores the saved revision and review status. Refresh restores pending corrections on the same address and device.
+
+The branded address above is the main entry. The older tp-intern-malaysia address keeps a recovery workflow for existing saved receipts; finish and export there before clearing them and continuing to the main app.
 
 ## Why This Is More Than An API Call
 
@@ -29,7 +30,7 @@ Key product decisions:
 
 - AI creates the first draft; the user remains responsible for uncertain or incomplete fields.
 - Batch queue UX supports up to five receipts while keeping extraction sequential to reduce quota risk.
-- Download is available only when the required structured fields are complete.
+- Export requires valid saved fields and an explicit human review of that revision.
 - The backend stays small: one secure `POST /api/extract-receipt` route handles validation, rate limiting, and Gemini calls.
 
 ## What I Built
@@ -46,8 +47,8 @@ Key product decisions:
 - Editable details panel for manual correction.
 - Inline receipt preview inside `Needs review` details so users can compare the image while fixing fields.
 - Red validation states for missing required fields.
-- JSON download only for complete results.
-- Batch JSON download that includes only selected complete results.
+- CSV export only for saved, reviewed results.
+- Secondary batch JSON retains original extraction and reviewed values.
 
 ## Engineering Signals
 
@@ -57,7 +58,7 @@ Key product decisions:
 | Input validation | File type and size are checked before extraction. |
 | Output validation | Gemini output is parsed, normalized, and validated with Zod. |
 | Human review | Low-confidence or incomplete results become `Needs review`. |
-| Abuse protection | In-memory per-IP rate limit allows 15 extractions per minute. |
+| Abuse protection | Shared limits allow 15 calls per IP per minute and 100 provider calls per UTC day. |
 | Test strategy | Default tests mock Gemini for deterministic CI. |
 | Real integration | Optional live Gemini Playwright smoke test validates the real API path. |
 | Deployment readiness | Vercel build, analytics, speed insights, and safe error messages are included. |
@@ -157,7 +158,7 @@ Next.js frontend
  - select files
  - preview images
  - review and edit extracted fields
- - download complete JSON
+ - export reviewed CSV
  ↓
 POST /api/extract-receipt
  - server-side file validation
@@ -172,7 +173,7 @@ Validated extraction draft
  ↓
 Human review queue
  ↓
-Complete JSON download
+Reviewed CSV export
 ```
 
 The AI handles uncertain visual extraction. Deterministic application code owns validation, completeness rules, UI state, downloads, and safe failure handling.

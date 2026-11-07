@@ -10,7 +10,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Download,
   Eye,
   FileImage,
   Plus,
@@ -307,12 +306,10 @@ function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClos
 
 function ExpandedReceiptDetails({
   item,
-  onFieldChange,
-  onSave
+  onFieldChange
 }: {
   item: ReceiptQueueItem;
   onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
-  onSave: (id: string) => void;
 }) {
   const reviewRequired = !isCompleteItem(item);
   const [showImage, setShowImage] = useState(false);
@@ -425,13 +422,7 @@ function ExpandedReceiptDetails({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onSave(item.id)}
-            className="mt-3 inline-flex items-center justify-center rounded-lg bg-slate-950 px-3 py-1.5 text-sm font-bold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Save changes
-          </button>
+
         </div>
 
         <aside className={clsx("rounded-xl border border-rose-100 bg-white p-2 lg:block lg:sticky lg:top-32 lg:self-start", !showImage && "hidden")}>
@@ -491,9 +482,10 @@ function ReceiptQueueItemRow({
   onToggleExpanded,
   onPreview,
   onDelete,
-  onDownload,
   onFieldChange,
   onSave,
+  onDiscard,
+  onReview,
   onSeen
 }: {
   item: ReceiptQueueItem;
@@ -501,9 +493,10 @@ function ReceiptQueueItemRow({
   onToggleExpanded: (id: string) => void;
   onPreview: (id: string) => void;
   onDelete: (id: string) => void;
-  onDownload: (id: string) => void;
   onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
   onSave: (id: string) => void;
+  onDiscard: (id: string) => void;
+  onReview: (id: string) => void;
   onSeen: (id: string) => void;
 }) {
   const complete = isCompleteItem(item);
@@ -594,11 +587,6 @@ function ReceiptQueueItemRow({
           <IconButton label={`Preview ${item.file.name}`} onClick={(event) => { event.currentTarget.focus(); onPreview(item.id); }} tone="preview">
             <Eye className="h-4 w-4" aria-hidden="true" />
           </IconButton>
-          {complete ? (
-            <IconButton label={`Download result for ${item.file.name}`} onClick={() => onDownload(item.id)} tone="download">
-              <Download className="h-4 w-4" aria-hidden="true" />
-            </IconButton>
-          ) : null}
           <IconButton label={`Delete ${item.file.name}`} onClick={() => onDelete(item.id)} tone="delete">
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </IconButton>
@@ -617,7 +605,18 @@ function ReceiptQueueItemRow({
         ) : null}
       </div>
 
-      {item.expanded ? <ExpandedReceiptDetails item={item} onFieldChange={onFieldChange} onSave={onSave} /> : null}
+      {item.expanded ? <ExpandedReceiptDetails item={item} onFieldChange={onFieldChange} /> : null}
+
+      {item.selected && !item.extraction && <p className="border-t border-slate-100 px-4 py-2 text-sm text-slate-600">Excluded from export — {item.status === "failed" ? "retry extraction, then review" : item.status === "extracting" ? "extraction is in progress" : "extract this receipt, then review"}.</p>}
+      {item.extraction && <div className="border-t border-slate-200 px-4 py-3 space-y-2 text-sm">
+        <p>Model confidence {item.extraction.confidence} · {complete ? "Reviewed" : JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "Unsaved changes" : "Saved · review required"}</p>
+        {item.selected && !complete && <p className="text-slate-600">Excluded from export — {JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "save or discard changes" : "correct errors and mark reviewed"}.</p>}
+        <div className="flex flex-wrap gap-2 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40">
+          <button onClick={() => onSave(item.id)}>Save changes</button>
+          <button onClick={() => onDiscard(item.id)}>Discard changes</button>
+          <button disabled={JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)} onClick={() => onReview(item.id)}>Mark reviewed</button>
+        </div>
+      </div>}
 
       {item.status === "extracting" ? (
         <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-100">
@@ -638,7 +637,9 @@ function FloatingBatchFooter({
   onSelectToggle,
   onFiles,
   onExtract,
-  onDownload
+  onDownload,
+  eligibleCount,
+  onJson
 }: {
   fileCount: number;
   selectedCount: number;
@@ -650,11 +651,13 @@ function FloatingBatchFooter({
   onFiles: (files: FileList | null) => void;
   onExtract: () => void;
   onDownload: () => void;
+  eligibleCount: number;
+  onJson: () => void;
 }) {
   const hasMultipleFiles = fileCount > 1;
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-30 w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
+    <div className="mx-auto mt-5 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {hasMultipleFiles ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -669,12 +672,12 @@ function FloatingBatchFooter({
           <p className="text-sm font-semibold text-slate-700">{selectedCount} selected</p>
         )}
         <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm">{eligibleCount} eligible</span>
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
-          {canDownloadSelected ? (
-            <button type="button" onClick={onDownload} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.14)] focus:outline-none focus:ring-2 focus:ring-emerald-500" title="Only current reviewed receipts can be exported.">
-              Export selected CSV
+            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.14)] focus:outline-none focus:ring-2 focus:ring-emerald-500" title="Only current reviewed receipts can be exported.">
+              Export expenses CSV ({eligibleCount})
             </button>
-          ) : null}
+          <button disabled={!canDownloadSelected} onClick={onJson} className="rounded-lg border px-3 py-2">Export JSON</button>
           <button
             type="button"
             disabled={!canExtractSelected}
@@ -696,6 +699,7 @@ export default function Home() {
   const closePreview = useCallback(() => setPreviewItemId(null), []);
   const [removedToast, setRemovedToast] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [legacy, setLegacy] = useState(false);
   const [busy, setBusy] = useState(false);
   const storageReady = useRef(false);
   const stopRequested = useRef(false);
@@ -711,11 +715,14 @@ export default function Home() {
     [selectedItems]
   );
   const completeSelectedItems = useMemo(() => selectedItems.filter(isCompleteItem), [selectedItems]);
-  const canAddMore = hydrated && !busy && !addingFiles && items.length < maxFiles;
+  const canAddMore = !legacy && hydrated && !busy && !addingFiles && items.length < maxFiles;
   const previewItem = items.find((item) => item.id === previewItemId) ?? null;
 
   useEffect(() => {
-    readBatch().then((saved) => {
+    const oldHost = window.location.hostname === "tp-intern-malaysia.vercel.app";
+    setLegacy(oldHost);
+    readBatch().then(async (saved) => {
+      if (oldHost && !saved.length) { await writeBatch([]); window.location.replace("https://receipt-to-form-syahmiharith.vercel.app/"); return; }
       storageReady.current = true;
       setItems(saved.map((item) => ({ ...item, previewUrl: URL.createObjectURL(item.file),
         status: item.status === "extracting" ? "failed" : item.status,
@@ -750,7 +757,7 @@ export default function Home() {
   }
 
   async function handleFiles(files: FileList | null) {
-    if (!files?.length || uploadInProgress.current || busy || !hydrated) return;
+    if (legacy || !files?.length || uploadInProgress.current || busy || !hydrated) return;
     uploadInProgress.current = true;
     setAddingFiles(true);
     const nextItems: ReceiptQueueItem[] = [];
@@ -805,7 +812,7 @@ export default function Home() {
   }
 
   function loadSamples() {
-    if (uploadInProgress.current || busy || itemsRef.current.length > maxFiles - 2) return;
+    if (legacy || uploadInProgress.current || busy || itemsRef.current.length > maxFiles - 2) return;
     const samples = [sampleReceipt("Sample cafe", "12.50", "12.50"), sampleReceipt("Sample stationery", "28.00", "23.00")];
     setItems((current) => [...current, ...samples]);
   }
@@ -953,20 +960,19 @@ export default function Home() {
     focusFirstError(id, errors);
   }
 
-  function clearSavedData() {
+  async function clearSavedData() {
     if (uploadInProgress.current || busy) return;
+    if (legacy) {
+      try { await writeBatch([]); }
+      catch { setErrorMessage("Could not clear saved data. Your receipts remain at this address. Try again before leaving."); return; }
+    }
     itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     storageReady.current = true;
     setErrorMessage(null);
     setRemovedToast(null);
     setPreviewItemId(null);
     setItems([]);
-  }
-
-  function downloadItem(id: string) {
-    const item = items.find((candidate) => candidate.id === id);
-    if (!item || !isCompleteItem(item)) return;
-    downloadJson(`${item.file.name.replace(/\.[^.]+$/, "")}-extraction.json`, buildDownloadPayload(item));
+    if (legacy) window.location.replace("https://receipt-to-form-syahmiharith.vercel.app/");
   }
 
   function downloadSelected() {
@@ -983,19 +989,11 @@ export default function Home() {
       <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
         <h1 className="text-2xl font-bold">Turn receipts into expense records</h1>
         <p>JPG, PNG or WebP · 5 MB each · up to five receipts. Live extraction sends images to the AI provider. Work is saved on this device for seven days after editing. Browser storage is a convenience and may be cleared by your browser.</p>
-        <button disabled={!hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}>Try two sample receipts</button>{" · "}
+        <button disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}>Try two sample receipts</button>{" · "}
         <button disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}>Delete batch / Clear saved data</button>
         {addingFiles && <p role="status">Checking selected receipts…</p>}
         {busy && <button onClick={() => { stopRequested.current = true; }}>Stop remaining work</button>}
-        <p aria-live="polite">Eligible exports {completeSelectedItems.length}. {items.filter((item) => item.extraction).length} of {items.length} extracted.</p>
-        {selectedItems.filter((item) => !isCompleteItem(item)).map((item) => <p key={item.id}>{item.file.name} excluded — {item.extraction && JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "save or discard changes" : "extract, correct errors and mark reviewed"}.</p>)}
-        {items.filter((item) => item.extraction).map((item) => <div key={item.id} className="flex flex-wrap gap-3">
-          <span>{item.file.name} · model confidence {item.extraction?.confidence} · {isCompleteItem(item) ? "Reviewed" : "Review required"}</span>
-          <button onClick={() => updateItem(item.id, (current) => ({ ...current, formValues: { ...(current.savedValues ?? current.formValues) }, errors: {} }))}>Discard changes</button>
-          <button disabled={JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)} onClick={() => markReviewed(item.id)}>Mark reviewed</button>
-        </div>)}
-        <button disabled={!completeSelectedItems.length} onClick={downloadSelected}>Export expenses CSV ({completeSelectedItems.length})</button>{" · "}
-        <button disabled={!completeSelectedItems.length} onClick={() => downloadJson("expenses.json", completeSelectedItems.map(buildDownloadPayload))}>Export JSON</button>
+        {legacy && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3">You are recovering receipts saved at the old address. Finish reviewing and export them here. Saved work stays here until cleared or expired. <a className="underline font-semibold" href="https://receipt-to-form-syahmiharith.vercel.app/">Open the main app</a></div>}
       </section>
       <main className="min-h-[calc(100vh-151px)] px-4 pb-28 pt-5 sm:px-6 lg:px-8">
         {items.length === 0 ? (
@@ -1025,9 +1023,10 @@ export default function Home() {
                   onToggleExpanded={toggleExpanded}
                   onPreview={openPreview}
                   onDelete={deleteItem}
-                  onDownload={downloadItem}
                   onFieldChange={updateField}
                   onSave={saveChanges}
+                  onReview={markReviewed}
+                  onDiscard={(id) => updateItem(id, (current) => ({ ...current, formValues: { ...(current.savedValues ?? current.formValues) }, errors: {} }))}
                   onSeen={markResultSeen}
                 />
               ))}
@@ -1049,6 +1048,8 @@ export default function Home() {
             }}
             onFiles={handleFiles}
             onExtract={extractSelected}
+            eligibleCount={completeSelectedItems.length}
+            onJson={() => downloadJson("expenses.json", completeSelectedItems.map(buildDownloadPayload))}
             onDownload={downloadSelected}
           />
         ) : null}

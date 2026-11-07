@@ -287,7 +287,7 @@ describe("POST /api/extract-receipt", () => {
 
     expect(response.status).toBe(429);
     expect(body.code).toBe("AI_PROVIDER_ERROR");
-    expect(body.error).toContain("The extraction service is rate limiting");
+    expect(body.error).toContain("Too many requests.");
   });
 
   it("keeps provider branding and raw diagnostics out of public errors", async () => {
@@ -435,11 +435,11 @@ describe("POST /api/extract-receipt", () => {
     expect(body.data).toMatchObject({
       confidence: "low",
       notes: [
-        "The extraction service returned an empty response. Please inspect the receipt image and enter the fields manually."
+        "No details could be read. Check the image and enter the fields manually."
       ]
     });
     expect(JSON.stringify(body.data)).toContain(
-      "The extraction service returned an empty response. Please inspect the receipt image and enter the fields manually."
+      "No details could be read. Check the image and enter the fields manually."
     );
   });
 });

@@ -96,14 +96,14 @@ function extractJsonText(rawText: string) {
 
 function getGeminiPublicErrorMessage(status: number) {
   if (status === 429) {
-    return "The extraction service is rate limiting extraction requests right now. Please wait a minute, then retry the failed receipt.";
+    return "Too many requests. Try again later, or use sample receipts.";
   }
 
   if (status === 500 || status === 502 || status === 503 || status === 504) {
-    return "The extraction service is temporarily unavailable or overloaded. Please retry the failed receipt in a moment.";
+    return "Extraction is temporarily unavailable. Try again later, or use sample receipts.";
   }
 
-  return "Extraction is unavailable. Try sample receipts or contact the project owner.";
+  return "Extraction is unavailable. Try sample receipts or retry later.";
 }
 
 function buildNeedsReviewFallback(note: string): ReceiptExtraction {
@@ -216,7 +216,7 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
 
   if (!modelText) {
     return buildNeedsReviewFallback(
-      "The extraction service returned an empty response. Please inspect the receipt image and enter the fields manually."
+      "No details could be read. Check the image and enter the fields manually."
     );
   }
 

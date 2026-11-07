@@ -158,7 +158,7 @@ test("pending uploads cannot race sample loading or batch clearing", async ({ pa
   await page.locator('input[type="file"]').first().setInputFiles(files(3));
   expect(await page.getByRole("button", { name: "Try two sample receipts" }).isDisabled()).toBe(true);
   expect(await page.getByRole("button", { name: "Clear saved receipts" }).isDisabled()).toBe(true);
-  await page.evaluate(() => (window as Window & { releaseReceiptReads: () => void }).releaseReceiptReads());
+  await page.evaluate(() => (window as unknown as { releaseReceiptReads: () => void }).releaseReceiptReads());
   await expect(page.locator("article")).toHaveCount(5);
   await expect(page.getByRole("button", { name: "Clear saved receipts" })).toBeEnabled();
   await page.getByRole("button", { name: "Clear saved receipts" }).click();

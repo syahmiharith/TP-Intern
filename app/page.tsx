@@ -504,7 +504,8 @@ function ReceiptQueueItemRow({
   onSeen: (id: string) => void;
 }) {
   const complete = isCompleteItem(item);
-  const hasLeftEdge = item.status === "failed" || Object.keys(item.errors).length > 0;
+  const hasErrors = Object.values(item.errors).some(Boolean);
+  const hasLeftEdge = item.status === "failed" || hasErrors;
   const canShowProcessedActions = !["ready", "extracting"].includes(item.status);
   const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
     if (!canShowProcessedActions) return;
@@ -529,7 +530,7 @@ function ReceiptQueueItemRow({
         !complete && !hasLeftEdge && item.status !== "extracting" && "border-slate-200",
         item.status === "extracting" && "border-blue-200",
         complete && "border-emerald-200",
-        Object.keys(item.errors).length > 0 && "border-rose-200",
+        hasErrors && "border-rose-200",
 
         item.status === "failed" && "border-rose-200"
       )}
@@ -613,7 +614,7 @@ function ReceiptQueueItemRow({
 
       {item.selected && !item.extraction && <p className="border-t border-slate-100 px-4 py-2 text-sm text-slate-600">Excluded from export — {item.status === "failed" ? "retry extraction, then review" : item.status === "extracting" ? "extraction is in progress" : "extract this receipt, then review"}.</p>}
       {item.extraction && <div className="border-t border-slate-200 px-4 py-3 space-y-2 text-sm">
-        {item.selected && !complete && <p className="text-slate-600">{JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "Save or discard changes before export." : Object.keys(item.errors).length ? "Resolve the highlighted fields before export." : "Mark reviewed to include in export."}</p>}
+        {item.selected && !complete && <p className="text-slate-600">{JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "Save or discard changes before export." : hasErrors ? "Resolve the highlighted fields before export." : "Mark reviewed to include in export."}</p>}
         <div className="flex flex-wrap gap-2 [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40">
           <button aria-label="Save changes" title="Save changes" onClick={() => onSave(item.id)}><Save className="h-4 w-4" aria-hidden="true" /></button>
           <button aria-label="Discard changes" title="Discard changes" onClick={() => onDiscard(item.id)}><RotateCcw className="h-4 w-4" aria-hidden="true" /></button>
@@ -676,15 +677,15 @@ function FloatingBatchFooter({
         )}
         <div className="flex flex-wrap items-center gap-2">
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
-            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.14)] focus:outline-none focus:ring-2 focus:ring-emerald-500" title="Only current reviewed receipts can be exported.">
+            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition enabled:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40" title="Only current reviewed receipts can be exported.">
               <Download className="mr-2 inline h-4 w-4" aria-hidden="true" />Export expenses CSV ({eligibleCount})
             </button>
-          <button aria-label="Export JSON" title="Export provenance JSON" disabled={!canDownloadSelected} onClick={onJson} className="min-h-11 min-w-11 rounded-lg border px-3 py-2"><FileJson className="h-4 w-4" aria-hidden="true" /></button>
+          <button aria-label="Export JSON" title="Export provenance JSON" disabled={!canDownloadSelected} onClick={onJson} className="min-h-11 min-w-11 rounded-lg border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40"><FileJson className="h-4 w-4" aria-hidden="true" /></button>
           <button
             type="button"
             disabled={!canExtractSelected}
             onClick={onExtract}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.16)] focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:hover:shadow-none"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:hover:shadow-none"
           >
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             {canExtractSelected ? `Extract ${extractCount} ${extractCount === 1 ? "file" : "files"}` : "Extract"}

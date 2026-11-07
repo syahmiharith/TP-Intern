@@ -3,7 +3,7 @@ import {gotoHome,uploadReceipt,mockExtractionResponse,highConfidenceExtraction} 
 import {readFile} from 'node:fs/promises';
 test('samples and uploads use one review queue and one export toolbar',async({page})=>{
  await mockExtractionResponse(page,highConfidenceExtraction);await gotoHome(page);
- await page.getByRole('button',{name:'Try two sample receipts'}).click();await uploadReceipt(page);
+ await page.getByRole('button',{name:'Try samples'}).click();await uploadReceipt(page);
  await expect(page.locator('article')).toHaveCount(3);
  await page.getByRole('button',{name:'Extract 1 file',exact:true}).click();
  await expect(page.locator('article').filter({hasText:'sample-receipt.png'}).getByRole('button',{name:'Mark reviewed',exact:true})).toBeVisible();

@@ -43,7 +43,7 @@ test.describe("receipt review and validation", () => {
     await extractButton(page, /Extract 1 file/i).click();
     await expandCurrentReceipt(page);
 
-    await saveChanges(page);
+    await page.getByRole("button", {name:"Mark reviewed",exact:true}).click();
     await expect(page.getByText("Merchant name is required.")).toBeVisible();
     await expect(page.getByText("Date is required.")).toBeVisible();
     await expect(page.getByText("Total amount must be a number greater than 0.")).toBeVisible();

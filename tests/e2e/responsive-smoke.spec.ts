@@ -28,7 +28,7 @@ test.describe("responsive receipt queue smoke", () => {
     await expect(page.getByRole("button", { name: "Export expenses CSV (1)" })).toBeVisible();
 
     await expandCurrentReceipt(page);
-    await expect(page.getByText("Extracted Items")).toBeVisible();
+    await page.getByText("Extracted items (1)", {exact:true}).click();
     await expect(page.getByText("Coffee")).toBeVisible();
   });
 });

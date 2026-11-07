@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
+import { readBatch } from "@/lib/expense-workflow";
 
 vi.mock("@/lib/expense-workflow", async (importOriginal) => ({ ...await importOriginal<object>(), readBatch: vi.fn(async () => []), writeBatch: vi.fn(async () => {}) }));
 
@@ -9,7 +10,7 @@ function createImageFile(name = "receipt.png") {
 }
 
 async function uploadFiles(files: File[]) {
-  await waitFor(() => expect(screen.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Try samples" })).toBeEnabled());
   const input = document.querySelector('input[type="file"]') as HTMLInputElement | null;
   if (!input) throw new Error("File input was not found");
   fireEvent.change(input, { target: { files } });
@@ -40,6 +41,7 @@ const partialExtraction = {
 
 describe("Home page receipt queue", () => {
   beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
     vi.stubGlobal("URL", {
       createObjectURL: vi.fn(() => "blob:receipt-preview"),
       revokeObjectURL: vi.fn()
@@ -51,11 +53,23 @@ describe("Home page receipt queue", () => {
     vi.restoreAllMocks();
   });
 
+  it("keeps entry controls disabled until saved receipts are loaded", async () => {
+    let finishLoading!: (value: []) => void;
+    vi.mocked(readBatch).mockReturnValueOnce(new Promise<[]>((resolve) => { finishLoading = resolve; }));
+    render(<Home />);
+    expect(screen.getByText("Loading saved receipts…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try samples" })).toBeDisabled();
+    expect(screen.getByLabelText(/Upload receipts/)).toBeDisabled();
+    await act(async () => finishLoading([]));
+    expect(screen.queryByText("Loading saved receipts…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try samples" })).toBeEnabled();
+  });
+
   it("starts with only the upload area", async () => {
     render(<Home />);
 
-    expect(screen.getByText("Upload receipt files")).toBeInTheDocument();
-    expect(screen.getByText(/JPG, PNG, WEBP/i)).toBeInTheDocument();
+    expect(screen.getByText("Upload receipts")).toBeInTheDocument();
+    expect(screen.getByText(/JPG, PNG or WEBP/i)).toBeInTheDocument();
     expect(screen.getByText("Receipt-to-Form")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Turn receipts into expense records/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Extract/i })).not.toBeInTheDocument();
@@ -110,7 +124,7 @@ describe("Home page receipt queue", () => {
     fireEvent.click(screen.getByRole("button", { name: /Extract 1 file/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Extracted · high/i)).toBeInTheDocument();
+      expect(screen.getByText(/Needs review/i)).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));

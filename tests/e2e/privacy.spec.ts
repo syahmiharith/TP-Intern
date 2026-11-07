@@ -19,7 +19,7 @@ test('provider name is only disclosed in opt-in privacy details',async({page})=>
  await details.locator('summary').focus();await page.keyboard.press('Enter');
  await expect(details.getByText(/Live extraction uses Google Gemini/)).toBeVisible();
  await page.keyboard.press('Enter');await expect(details.getByText(/Live extraction uses Google Gemini/)).toBeHidden();
- await page.getByRole('button',{name:'Try two sample receipts'}).click();
+ await page.getByRole('button',{name:'Try samples'}).click();
  await expect(page.locator('article')).toHaveCount(2);
  for(const card of await page.locator('article').all()){
   expect(await card.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(255, 255, 255)');

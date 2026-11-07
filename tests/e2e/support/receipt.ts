@@ -118,8 +118,8 @@ export async function typeTextInput(locator: Locator, value: string) {
 
 export async function gotoHome(page: Page) {
   await page.goto("/");
-  await expect(page.getByText("Upload receipt files")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled();
+  await expect(page.getByText("Upload receipts")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try samples" })).toBeEnabled();
 }
 
 export async function uploadReceipt(page: Page, file = defaultReceiptFile) {
@@ -139,7 +139,7 @@ export async function uploadReceipts(page: Page, files = [defaultReceiptFile]) {
 
 export async function expectReceiptQueued(page: Page, fileName: string) {
   await expect(page.getByText(fileName, { exact: true })).toBeVisible();
-  await expect(page.getByText(/Waiting for extraction/i)).toBeVisible();
+  await expect(page.getByText(/^Queued$/i)).toBeVisible();
 }
 
 export async function mockExtractionResponse(
@@ -180,7 +180,7 @@ export async function runMockedExtraction(page: Page, extraction = highConfidenc
 
 export async function expandCurrentReceipt(page: Page, fileName = defaultReceiptFile.name) {
   await expandButton(page, fileName).click();
-  await expect(page.getByRole("heading", { name: /Receipt Details|Review Required/i })).toBeVisible();
+  await expect(merchantNameInput(page)).toBeVisible();
 }
 
 export async function expectFormValues(

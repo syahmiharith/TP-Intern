@@ -4,7 +4,7 @@ import { storedImageCount } from "./support/receipt";
 
 test("reviewed corrections survive refresh and CSV uses current reviewed values", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await page.getByRole("button", { name: "Try samples" }).click();
   await page.getByRole("button", { name: "Mark reviewed", exact: true }).nth(1).click();
   const total = page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1);
   await total.fill("28.00");
@@ -13,7 +13,7 @@ test("reviewed corrections survive refresh and CSV uses current reviewed values"
   await page.waitForTimeout(300);
   await page.reload();
   await expect(page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1)).toHaveValue("28.00");
-  await page.getByRole("button", { name: "Save changes", exact: true }).nth(1).click();
+  await page.locator("article").nth(1).getByRole("button", { name: "Save changes", exact: true }).click();
   await page.getByRole("button", { name: "Mark reviewed", exact: true }).nth(1).click();
   const reviewedRow = page.locator("article").nth(1);
   await expect(reviewedRow.getByText("Reviewed", { exact: true })).toBeVisible();
@@ -24,9 +24,9 @@ test("reviewed corrections survive refresh and CSV uses current reviewed values"
   const csv = await readFile((await file.path())!, "utf8");
   expect(csv).toContain('"28.00"');
   expect(csv).toContain('"Sample stationery.png"');
-  await expect(page.getByText(/^low confidence$/i)).toBeVisible();
+  await expect(page.getByText(/^Model confidence: low$/i)).toBeVisible();
   await page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1).fill("30.00");
-  await page.getByRole("button", { name: "Discard changes", exact: true }).nth(1).click();
+  await page.locator("article").nth(1).getByRole("button", { name: "Discard changes", exact: true }).click();
   await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();
 });
 
@@ -34,7 +34,7 @@ for (const width of [375, 768, 1280]) {
   test(`sample review fits ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    await page.getByRole("button", { name: "Try two sample receipts" }).click();
+    await page.getByRole("button", { name: "Try samples" }).click();
     await expect(page.getByRole("textbox", { name: "Merchant Name", exact: true }).first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width < 1024) {
@@ -48,22 +48,24 @@ for (const width of [375, 768, 1280]) {
 
 test("deletion persists and unavailable storage is explained", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await page.getByRole("button", { name: "Try samples" }).click();
   await page.getByRole("button", { name: "Clear all saved receipts" }).click();
   await page.waitForTimeout(300);
   await page.reload();
-  await expect(page.getByText("Upload receipt files")).toBeVisible();
+  await expect(page.getByText("Upload receipts")).toBeVisible();
   await page.addInitScript(() => { Object.defineProperty(window, "indexedDB", { get() { throw new Error("Storage unavailable"); } }); });
   await page.reload();
   await expect(page.getByText(/Saved data could not be opened|Could not save on this device/)).toBeVisible();
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
-  await expect(page.getByText(/Could not save on this device/)).toBeVisible();
+  await page.getByRole("button", { name: "Try samples" }).click();
+  await expect(page.getByText(/Saved data could not be opened|Could not save on this device/)).toBeVisible();
 });
 
 test("expired saved receipts are removed on return", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await page.getByRole("button", { name: "Try samples" }).click();
   await expect.poll(() => storedImageCount(page)).toBe(2);
+  await page.route("**/expiry-fixture", route => route.fulfill({contentType:"text/html",body:"<title>Expiry fixture</title>"}));
+  await page.goto("/expiry-fixture");
   await page.evaluate(async () => {
     await new Promise<void>((resolve, reject) => {
       const open = indexedDB.open("receipt-expenses");
@@ -82,9 +84,9 @@ test("expired saved receipts are removed on return", async ({ page }) => {
       };
     });
   });
-  await page.reload();
-  await expect(page.getByText("Upload receipt files")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled();
+  await page.goto("/");
+  await expect(page.getByText("Upload receipts")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try samples" })).toBeEnabled();
   await expect(page.getByText("Sample cafe.png", { exact: true })).toHaveCount(0);
   await expect.poll(() => storedImageCount(page)).toBe(0);
 });
@@ -97,7 +99,7 @@ test("mixed batch retries failures without replacing successful receipts", async
     await route.fulfill({ json: { data: { merchantName: "Cafe", receiptType: "Other", date: "2026-11-05", totalAmount: 12, currency: "USD", confidence: "low", notes: [], items: [] } } });
   });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Try samples" })).toBeEnabled();
   await page.locator('input[type="file"]').first().setInputFiles([
     { name: "first.png", mimeType: "image/png", buffer: Buffer.from("first") },
     { name: "second.png", mimeType: "image/png", buffer: Buffer.from("second") }

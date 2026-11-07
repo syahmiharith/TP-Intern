@@ -33,7 +33,7 @@ export default defineConfig({
     },
     {
       name: "mobile-safari",
-      testMatch: /(?:responsive-smoke|expense-workflow|runtime-verification|privacy|unified-(?:entry|queue))\.spec\.ts/,
+      testMatch: /(?:responsive-smoke|expense-workflow|runtime-verification|workflow-ui|privacy|unified-(?:entry|queue))\.spec\.ts/,
       use: { ...devices["iPhone 13"] }
     }
   ]

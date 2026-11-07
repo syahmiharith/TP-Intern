@@ -38,7 +38,7 @@ test.afterEach(async ({ page }, info) => {
 });
 
 test("notes corrections and spreadsheet-safe text round trip through CSV and JSON", async ({ page }) => {
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await page.getByRole("button", { name: "Try samples" }).click();
   const notes = '=SUM(1,2)\n"Meal", 서울';
   await page.getByRole("textbox", { name: "Notes", exact: true }).first().fill(notes);
   await page.getByLabel("Merchant Name", { exact: true }).first().fill("@Expense cafe");
@@ -60,22 +60,31 @@ test("notes corrections and spreadsheet-safe text round trip through CSV and JSO
 });
 
 test("receipt preview traps focus and closes with Escape", async ({ page }) => {
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await page.getByRole("button", { name: "Try samples" }).click();
   const trigger = page.getByRole("button", { name: "Preview Sample cafe.png", exact: true });
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Receipt Preview" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Rotate", exact: true })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Rotate clockwise", exact: true })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.locator("summary")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "Rotate clockwise", exact: true })).toBeFocused();
   await dialog.getByRole("button", { name: "Close preview", exact: true }).focus();
   await page.keyboard.press("Tab");
-  await expect(dialog.getByRole("button", { name: "Rotate", exact: true })).toBeFocused();
+  await expect(dialog.getByRole("region", { name: "Receipt image viewer" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(dialog.getByRole("button", { name: "Close preview", exact: true })).toBeFocused();
   const image = dialog.getByRole("img");
   const originalTransform = await image.evaluate((element) => getComputedStyle(element).transform);
-  await dialog.getByRole("button", { name: "Rotate", exact: true }).click();
+  await dialog.getByRole("button", { name: "Rotate clockwise", exact: true }).click();
   await expect.poll(() => image.evaluate((element) => getComputedStyle(element).transform)).not.toBe(originalTransform);
-  await dialog.getByRole("button", { name: "Toggle zoom", exact: true }).click();
+  await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Zoom out", exact: true })).toBeVisible();
+  const viewer = dialog.getByRole("region", {name:"Receipt image viewer"});
+  await expect.poll(() => viewer.evaluate(el => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight)).toBe(true);
+  await viewer.evaluate(el => el.scrollTo(el.scrollWidth, el.scrollHeight));
+  expect(await viewer.evaluate(el => el.scrollLeft > 0 || el.scrollTop > 0)).toBe(true);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
@@ -118,11 +127,11 @@ test("stopping the queue preserves completed receipts and remaining receipts sta
   await uploadReceipts(page, files(3));
   await page.getByRole("button", { name: "Extract 3 files", exact: true }).click();
   await expect.poll(() => calls).toBe(1);
-  await page.getByRole("button", { name: "Stop remaining work", exact: true }).click();
+  await page.getByRole("button", { name: "Stop queue after current receipt", exact: true }).click();
   release();
   await expect(page.getByRole("button", { name: "Extract 2 files", exact: true })).toBeEnabled();
   expect(calls).toBe(1);
-  await expect(page.getByText("Waiting for extraction", { exact: true })).toHaveCount(2);
+  await expect(page.locator("article").getByText("Queued", { exact: true })).toHaveCount(2);
   await page.getByRole("button", { name: "Extract 2 files", exact: true }).click();
   await expect(page.getByText(/FamilyMart · KRW/)).toHaveCount(3);
   expect(calls).toBe(3);
@@ -136,7 +145,7 @@ test("duplicate content is skipped and the five-receipt boundary is enforced", a
   await expect(page.locator("article")).toHaveCount(1);
   await page.locator('input[type="file"]').first().setInputFiles(files(5).slice(1));
   await expect(page.locator("article")).toHaveCount(5);
-  await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Try samples" })).toBeDisabled();
   await expect(page.getByLabel("Add files")).toBeDisabled();
 });
 
@@ -153,10 +162,10 @@ test("pending uploads cannot race sample loading or batch clearing", async ({ pa
     } });
   });
   await page.reload();
-  await expect(page.getByRole("button", { name: "Try two sample receipts" })).toBeEnabled();
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await expect(page.getByRole("button", { name: "Try samples" })).toBeEnabled();
+  await page.getByRole("button", { name: "Try samples" }).click();
   await page.locator('input[type="file"]').first().setInputFiles(files(3));
-  expect(await page.getByRole("button", { name: "Try two sample receipts" }).isDisabled()).toBe(true);
+  expect(await page.getByRole("button", { name: "Try samples" }).isDisabled()).toBe(true);
   expect(await page.getByRole("button", { name: "Clear all saved receipts" }).isDisabled()).toBe(true);
   await page.evaluate(() => (window as unknown as { releaseReceiptReads: () => void }).releaseReceiptReads());
   await expect(page.locator("article")).toHaveCount(5);
@@ -164,7 +173,7 @@ test("pending uploads cannot race sample loading or batch clearing", async ({ pa
   await page.getByRole("button", { name: "Clear all saved receipts" }).click();
   await expect.poll(async () => (await storedBatch(page)).items.length).toBe(0);
   await page.reload();
-  await expect(page.getByText("Upload receipt files")).toBeVisible();
+  await expect(page.getByText("Upload receipts")).toBeVisible();
 });
 
 test("unsupported saved schemas are preserved until the user clears them", async ({ page }) => {
@@ -185,7 +194,7 @@ test("unsupported saved schemas are preserved until the user clears them", async
   await expect(page.locator('main [role="alert"]')).toBeHidden();
   await expect.poll(async () => (await storedBatch(page)).schemaVersion).toBe(2);
   await page.reload();
-  await expect(page.getByText("Upload receipt files")).toBeVisible();
+  await expect(page.getByText("Upload receipts")).toBeVisible();
 });
 
 test("storage quota errors keep in-memory reviewed values exportable and recover after clearing", async ({ page }) => {
@@ -197,7 +206,7 @@ test("storage quota errors keep in-memory reviewed values exportable and recover
       return put.call(this, value, key);
     };
   });
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await page.getByRole("button", { name: "Try samples" }).click();
   await expect(page.locator('main [role="alert"]')).toContainText("Could not save on this device");
   await page.getByRole("button", { name: "Mark reviewed", exact: true }).first().click();
   await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();
@@ -231,8 +240,8 @@ test("review validation opens actionable fields and enforces currency minor unit
 
 test("the last receipt remains actionable at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
-  await page.getByRole("button", { name: "Save changes", exact: true }).last().click();
+  await page.getByRole("button", { name: "Try samples" }).click();
+  await page.getByRole("button", { name: "Mark reviewed", exact: true }).last().click();
   await expect(page.getByLabel("Total Amount", { exact: true }).last()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -288,12 +297,12 @@ test("legacy saved receipts migrate atomically with reviewed values and images i
 
 
 test("deleting receipts and clearing the batch remove stored source images", async ({ page }) => {
-  await page.getByRole("button", { name: "Try two sample receipts" }).click();
+  await page.getByRole("button", { name: "Try samples" }).click();
   await expect.poll(() => storedImageCount(page)).toBe(2);
   await page.getByRole("button", { name: "Delete Sample cafe.png", exact: true }).click();
   await expect.poll(() => storedImageCount(page)).toBe(1);
   await page.getByRole("button", { name: "Clear all saved receipts" }).click();
   await expect.poll(() => storedImageCount(page)).toBe(0);
   await page.reload();
-  await expect(page.getByText("Upload receipt files")).toBeVisible();
+  await expect(page.getByText("Upload receipts")).toBeVisible();
 });

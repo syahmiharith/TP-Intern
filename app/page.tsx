@@ -1050,7 +1050,7 @@ export default function Home() {
       </section>
       <main className="flex flex-1 flex-col px-4 pb-4 pt-5 sm:px-6 lg:px-8">
         {items.length === 0 ? (
-          <div className="flex min-h-[calc(100vh-18rem)] flex-col items-center justify-center gap-4">
+          <div className="flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center gap-4">
             {errorMessage ? (
               <div className="w-full max-w-3xl rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert">
                 {errorMessage}

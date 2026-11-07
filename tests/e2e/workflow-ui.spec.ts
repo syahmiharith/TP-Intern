@@ -1,5 +1,6 @@
 import {expect,test,type Route} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
+import {currentCurrencies} from '../../lib/currencies';
 import {gotoHome,highConfidenceExtraction,uploadReceipts} from './support/receipt';
 
 for(const width of [375,768,1280]){
@@ -105,7 +106,9 @@ for (const width of [375, 768, 1280]) {
   const row=page.locator('article').first();
   const currency=row.getByRole('combobox',{name:'Currency',exact:true});
   await currency.click();
-  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option')).toHaveCount(await page.evaluate(()=>Intl.supportedValuesOf('currency').length));
+  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option')).toHaveCount(currentCurrencies.length);
+  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option',{name:/^BGN /})).toHaveCount(0);
+  await expect(row.getByRole('listbox',{name:'Currencies'}).getByRole('option',{name:/^XCG /})).toHaveCount(1);
   await currency.fill('Malaysian');
   await expect(row.getByRole('option',{name:'MYR Malaysian Ringgit'})).toBeVisible();
   await currency.press('ArrowDown');

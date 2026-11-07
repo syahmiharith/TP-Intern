@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import clsx from "clsx";
+import { currentCurrencies } from "@/lib/currencies";
 
-// The same complete currency set used by receipt validation; no regional shortlist.
+// Current ISO codes, independent of the browser's historical currency catalogue.
 const names = new Intl.DisplayNames(["en"], { type: "currency" });
-export const currencies = Intl.supportedValuesOf("currency").map((code) => ({
-  code, name: names.of(code) ?? code
+export const currencies = currentCurrencies.map(({ code, name }) => ({
+  code, name: names.of(code) === code ? name : names.of(code) ?? name
 }));
 
 export function CurrencyField({ id, value, error, onChange }: {

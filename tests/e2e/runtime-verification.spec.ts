@@ -31,16 +31,31 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(async ({ page }, info) => {
   expect(runtimeErrors.get(page)).toEqual([]);
-  if (info.status === "passed" && info.title.startsWith("notes corrections")) {
+  if (info.status === "passed" && info.title.startsWith("immutable saved notes")) {
     await page.getByLabel("Notes", { exact: true }).first().scrollIntoViewIfNeeded();
     await info.attach("reviewed-expense", { body: await page.screenshot(), contentType: "image/png" });
   }
 });
 
-test("notes corrections and spreadsheet-safe text round trip through CSV and JSON", async ({ page }) => {
+test("immutable saved notes and spreadsheet-safe text round trip through CSV and JSON", async ({ page }) => {
   await page.getByRole("button", { name: "Try samples" }).click();
   const notes = '=SUM(1,2)\n"Meal", 서울';
-  await page.getByRole("textbox", { name: "Notes", exact: true }).first().fill(notes);
+  await expect.poll(() => storedImageCount(page)).toBe(2);
+  await page.route("**/notes-fixture", route => route.fulfill({contentType:"text/html",body:"<title>Saved notes fixture</title>"}));
+  await page.goto("/notes-fixture");
+  await page.evaluate(async notes => {
+    await new Promise<void>((resolve,reject) => {
+      const open=indexedDB.open("receipt-expenses");
+      open.onsuccess=()=>{const db=open.result;const tx=db.transaction("batches","readwrite");const store=tx.objectStore("batches");const get=store.get("current");
+        get.onsuccess=()=>{const record=get.result;record.items[0].formValues.notes=notes;record.items[0].savedValues.notes=notes;store.put(record,"current");};
+        tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);
+      };open.onerror=()=>reject(open.error);
+    });
+  },notes);
+  await page.goto("/");
+  await expect(page.getByRole("textbox", {name:"Notes",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("list",{name:"Notes",exact:true}).first().getByRole("listitem")).toHaveText(['=SUM(1,2)', '\"Meal\", 서울']);
+  await expect(page.getByRole("list",{name:"Extraction notes",exact:true}).first()).toContainText("Client meeting");
   await page.getByLabel("Merchant Name", { exact: true }).first().fill("@Expense cafe");
   await page.getByRole("button", { name: "Save changes", exact: true }).first().click();
   await page.getByRole("button", { name: "Mark reviewed", exact: true }).first().click();
@@ -290,7 +305,7 @@ test("legacy saved receipts migrate atomically with reviewed values and images i
   await page.reload();
   await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();
   await expect(page.getByLabel("Merchant Name", { exact: true })).toHaveValue("Legacy corrected cafe");
-  await expect(page.getByLabel("Notes", { exact: true })).toHaveValue("Retained correction");
+  await expect(page.getByRole("list", { name: "Notes", exact: true })).toContainText("Retained correction");
   await expect.poll(() => page.getByAltText("Inline preview of legacy.png").evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export expenses CSV (1)", exact: true }).click();

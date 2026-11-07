@@ -13,6 +13,8 @@ import {
   MessageSquare,
   Save,
   FileText,
+  Files,
+  Loader2,
   RotateCcw,
   RotateCw,
   ZoomIn,
@@ -108,7 +110,7 @@ function statusLabel(item: ReceiptQueueItem) {
   if (item.extraction && JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues)) return "Unsaved changes";
   if (item.extraction) return "Needs review";
   if (item.status === "ready") return "Queued";
-  if (item.status === "extracting") return "Reading";
+  if (item.status === "extracting") return "Extracting";
   return item.status[0].toUpperCase() + item.status.slice(1);
 }
 
@@ -396,57 +398,6 @@ function ExpandedReceiptDetails({
             <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange} />
           </div>
 
-          <div className="mt-3 space-y-1">
-            <label className="block text-xs font-semibold text-slate-700" htmlFor={`${item.id}-notes`}>Notes</label>
-            <textarea
-              id={`${item.id}-notes`}
-              value={item.formValues.notes}
-              onChange={(event) => onFieldChange(item.id, "notes", event.target.value)}
-              rows={2}
-              placeholder="Add a note (optional)"
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1 text-xs text-slate-500">
-            <p title="The model’s confidence in its original extraction. Unchanged by your edits or review.">Extraction confidence <span className="font-semibold capitalize text-slate-700">{item.extraction?.confidence ?? "unavailable"}</span></p>
-            {Boolean(item.extraction?.notes.length) && <details className="max-w-full">
-              <summary className="cursor-pointer rounded pb-2 text-slate-600 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Extraction notes</summary>
-              <ul className="max-w-md list-disc space-y-1 pb-2 pl-4 text-slate-600">{item.extraction?.notes.map((note, index) => <li key={index}>{note}</li>)}</ul>
-            </details>}
-          </div>
-
-          {item.extraction?.items.length ? <details className="mt-3">
-            <summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Extracted items ({item.extraction.items.length})</summary>
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="px-3 py-1.5">Item</th>
-                    <th className="w-20 px-3 py-1.5">Qty</th>
-                    <th className="w-28 px-3 py-1.5">Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {item.extraction?.items.length ? (
-                    item.extraction.items.map((lineItem, index) => (
-                      <tr key={`${lineItem.name}-${index}`} className="border-t border-slate-100">
-                        <td className="px-3 py-1.5 text-slate-800">{lineItem.name}</td>
-                        <td className="px-3 py-1.5 text-slate-600">{lineItem.quantity ?? "—"}</td>
-                        <td className="px-3 py-1.5 text-slate-600">{lineItem.value ?? "Needs review"}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="px-3 py-3 text-slate-500" colSpan={3}>
-                        No line items extracted.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </details> : null}
 
         </div>
 
@@ -461,6 +412,40 @@ function ExpandedReceiptDetails({
       </div>
     </div>
   );
+}
+
+function ReceiptInsights({ item }: { item: ReceiptQueueItem }) {
+  if (!item.extraction) return null;
+  const notes = item.formValues.notes.split("\n").map((note) => note.trim()).filter(Boolean);
+  const originalNotes = item.extraction.notes.filter((note) => !notes.includes(note.trim()));
+  return <section aria-label="Receipt details" className="space-y-3 border-t border-slate-100 px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h3 className="text-xs font-semibold text-slate-700">Notes</h3>
+      <p className="text-xs text-slate-500" title="The model’s confidence in its original extraction. Unchanged by your edits or review.">Extraction confidence <span className="font-semibold capitalize text-slate-700">{item.extraction.confidence}</span></p>
+    </div>
+    <ul aria-label="Notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">
+      {(notes.length ? notes : ["No notes."]).map((note, index) => <li key={index}>{note}</li>)}
+    </ul>
+    {originalNotes.length > 0 && <div>
+      <h3 className="mb-1 text-xs font-semibold text-slate-700">Extraction notes</h3>
+      <ul aria-label="Extraction notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">{originalNotes.map((note, index) => <li key={index}>{note}</li>)}</ul>
+    </div>}
+    {item.extraction.items.length > 0 && <div>
+      <h3 className="mb-2 text-xs font-semibold text-slate-700">Extracted items ({item.extraction.items.length})</h3>
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <table aria-label="Extracted items" className="w-full table-fixed text-left text-sm">
+          <thead className="bg-slate-50 text-xs text-slate-500"><tr>
+            <th className="px-3 py-2 font-medium">Item</th><th className="w-14 px-2 py-2 text-right font-medium">Qty</th><th className="w-20 px-3 py-2 text-right font-medium">Value</th>
+          </tr></thead>
+          <tbody>{item.extraction.items.map((line, index) => <tr key={index} className="border-t border-slate-100">
+            <td className="px-3 py-2 text-slate-800 [overflow-wrap:anywhere]">{line.name}</td>
+            <td className="px-2 py-2 text-right text-slate-600 [overflow-wrap:anywhere]">{line.quantity ?? "—"}</td>
+            <td className="px-3 py-2 text-right text-slate-600 [overflow-wrap:anywhere]">{line.value ?? "—"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </div>}
+  </section>;
 }
 
 function EditableField({
@@ -541,6 +526,7 @@ function ReceiptQueueItemRow({
 
   return (
     <article
+      aria-busy={item.status === "extracting"}
       className={clsx(
         "relative rounded-2xl border bg-white shadow-sm transition-colors duration-300",
         !complete && !hasLeftEdge && item.status !== "extracting" && "border-slate-200",
@@ -583,7 +569,7 @@ function ReceiptQueueItemRow({
               onClick={() => onToggleExpanded(item.id)}
               className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1 rounded text-left text-sm font-bold text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
             ><span className="truncate">{item.file.name}</span>{item.expanded ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}</button> : <p className="min-w-0 truncate text-sm font-bold text-slate-950" title={item.file.name}>{item.file.name}</p>}
-            <span data-testid="receipt-status" className={clsx("inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold leading-4",
+            <span id={`${item.id}-status`} role="status" tabIndex={-1} data-testid="receipt-status" className={clsx("inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold leading-4",
               complete ? "bg-emerald-100 text-emerald-800" : item.status === "failed" || hasErrors ? "bg-rose-100 text-rose-800" : dirty || item.extraction ? "bg-amber-100 text-amber-900" : "bg-blue-50 text-blue-800")}>{complete ? <Check className="h-3 w-3" aria-hidden="true" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />}{statusLabel(item)}</span>
             {canShowProcessedActions && !item.expanded && item.formValues.receiptType ? (
               <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
@@ -611,22 +597,26 @@ function ReceiptQueueItemRow({
       </div>
 
       {item.expanded && item.extraction ? <ExpandedReceiptDetails item={item} onFieldChange={onFieldChange} /> : null}
+      <ReceiptInsights item={item} />
 
-      {(item.status === "failed" || (!item.extraction && item.selected)) && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-sm">
-        {item.selected && <p className="text-slate-600">{item.status === "failed" ? "Retry this receipt to continue." : item.status === "extracting" ? "Review before exporting." : "Extract and review to export."}</p>}
+      {(item.status === "failed" || (!item.extraction && item.selected && item.status !== "extracting")) && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-sm">
+        {item.selected && <p className="text-slate-600">{item.status === "failed" ? "Retry this receipt to continue." : "Extract and review to export."}</p>}
         {item.status === "failed" && <button disabled={busy} onClick={() => onRetry(item.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40"><RotateCcw className="h-4 w-4" aria-hidden="true" />Retry</button>}
       </div>}
       {item.extraction && !complete && <div className="space-y-2 border-t border-slate-200 px-4 py-3 text-sm">
         {item.selected && <p className="text-slate-600">{hasErrors ? "Complete the highlighted fields to export." : dirty ? "Save your changes, then mark reviewed." : "Review to include in your export."}</p>}
         <div className="flex flex-wrap gap-2 [&_button]:min-h-11 [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-blue-500 [&_button:disabled]:opacity-40">
           {dirty && <>
-            <button aria-label="Save changes" title="Save changes" className="inline-flex items-center gap-2 border border-slate-300 bg-white" onClick={() => onSave(item.id)}><Save className="h-4 w-4" aria-hidden="true" />Save changes</button>
+            <button aria-label="Save changes" title="Save changes" className="inline-flex items-center gap-2 border border-slate-300 bg-white hover:bg-slate-50" onClick={() => onSave(item.id)}><Save className="h-4 w-4" aria-hidden="true" />Save changes</button>
             <button aria-label="Discard changes" title="Restore the last saved values" className="text-slate-600 hover:bg-slate-100" onClick={() => onDiscard(item.id)}>Discard changes</button>
           </>}
-          <button disabled={dirty} className="inline-flex items-center gap-2 border border-slate-300 bg-white" onClick={() => onReview(item.id)}><Check className="h-4 w-4" aria-hidden="true" />Mark reviewed</button>
+          <button id={`${item.id}-review`} disabled={dirty} title={dirty ? "Save or discard your changes first" : "Approve these saved values for export"} className="inline-flex items-center gap-2 border border-slate-300 bg-white hover:bg-slate-50" onClick={() => onReview(item.id)}><Check className="h-4 w-4" aria-hidden="true" />Mark reviewed</button>
         </div>
       </div>}
 
+      {item.status === "extracting" && <div role="progressbar" aria-label={`Extracting ${item.file.name}`} aria-valuetext="Waiting for extraction result" className="extraction-progress absolute inset-x-0 bottom-0 h-[3px] overflow-hidden rounded-b-2xl bg-blue-100">
+        <span aria-hidden="true" className="extraction-progress-segment absolute inset-y-0 left-0 w-1/3 rounded-full bg-blue-600" />
+      </div>}
     </article>
   );
 }
@@ -681,18 +671,18 @@ function FloatingBatchFooter({
         )}
         <div className="flex flex-wrap items-center gap-2">
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
-            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="min-h-11 rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition enabled:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40" title="Only current reviewed receipts can be exported.">
+            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="min-h-11 rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition enabled:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40" title={canDownloadSelected ? "Export selected, reviewed expenses" : "Select and review a receipt to export"}>
               <Download className="mr-2 inline h-4 w-4" aria-hidden="true" />Export expenses CSV ({eligibleCount})
             </button>
           {canDownloadSelected && <button aria-label="Export JSON" title="Export provenance JSON" onClick={onJson} className="min-h-11 min-w-11 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">JSON</button>}
-          {hasExtractable && <button
+          {(hasExtractable || busy) && <button
             type="button"
             disabled={!canExtractSelected}
             onClick={onExtract}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:opacity-40 disabled:hover:shadow-none"
+            className={clsx("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed", busy ? "bg-blue-50 text-blue-700" : "bg-blue-600 text-white enabled:hover:bg-blue-700 disabled:bg-slate-300 disabled:opacity-40")}
           >
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
-            {canExtractSelected ? `Extract ${extractCount} ${extractCount === 1 ? "file" : "files"}` : "Extract"}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+            {busy ? "Extracting…" : canExtractSelected ? `Extract ${extractCount} ${extractCount === 1 ? "file" : "files"}` : "Extract"}
           </button>}
         </div>
       </div>
@@ -891,7 +881,7 @@ export default function Home() {
     updateItem(id, (current) => ({
       ...current,
       status: "extracting",
-      progress: 5,
+      progress: 0,
       errorMessage: null,
       errors: {},
       isNewResult: false,
@@ -990,7 +980,8 @@ export default function Home() {
       ? { ...current, errors, expanded: true }
       : { ...current, savedValues: { ...current.formValues }, reviewedAt: undefined,
         editedAt: Date.now(), errors, status: "needs-review", resultSeen: true }));
-    focusFirstError(id, errors);
+    if (invalid) focusFirstError(id, errors);
+    else { setRemovedToast("Changes saved."); document.getElementById(`${id}-review`)?.focus(); }
   }
 
   function markReviewed(id: string) {
@@ -1002,7 +993,14 @@ export default function Home() {
       ...current, errors, expanded: invalid || current.expanded,
       reviewedAt: invalid ? undefined : new Date().toISOString(), editedAt: Date.now()
     })));
-    focusFirstError(id, errors);
+    if (invalid) focusFirstError(id, errors);
+    else { setRemovedToast("Receipt reviewed."); document.getElementById(`${id}-status`)?.focus(); }
+  }
+
+  function discardChanges(id: string) {
+    flushSync(() => updateItem(id, (current) => ({ ...current, formValues: { ...(current.savedValues ?? current.formValues) }, errors: {} })));
+    setRemovedToast("Changes discarded.");
+    document.getElementById(`${id}-status`)?.focus();
   }
 
   async function clearSavedData() {
@@ -1014,7 +1012,7 @@ export default function Home() {
     itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     storageReady.current = true;
     setErrorMessage(null);
-    setRemovedToast(null);
+    setRemovedToast("Receipts cleared.");
     setPreviewItemId(null);
     setItems([]);
     setQueueRun(null);
@@ -1038,7 +1036,7 @@ export default function Home() {
         <p className="max-w-2xl text-slate-600">Extract the details, review your expenses, and export to your spreadsheet.</p>
 
         <div className="flex flex-wrap items-center gap-2">
-        {items.length > 0 && <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}>Try samples</button>}
+        {items.length > 0 && <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>}
         {(items.length > 0 || errorMessage) && <button aria-label="Clear all saved receipts" title="Clear all receipts saved in this browser" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}>Clear all</button>}
         {addingFiles && <p role="status">Checking selected receipts…</p>}
         {busy && queueRun && queueRun.completed < queueRun.total - 1 && <button aria-label={queueRun?.stopping ? "Stopping after current receipt" : "Stop queue after current receipt"} disabled={queueRun?.stopping} onClick={() => { stopRequested.current = true; setQueueRun((run) => run && ({ ...run, stopping: true })); }}><Square className="mr-2 inline h-4 w-4" aria-hidden="true" />{queueRun?.stopping ? "Stopping…" : "Stop queue"}</button>}
@@ -1057,7 +1055,7 @@ export default function Home() {
               </div>
             ) : null}
             <UploadDropzone canAddMore={canAddMore && hydrated && !busy} onFiles={handleFiles} />
-            <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles} onClick={loadSamples} className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40">Try samples</button>
+            <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles} onClick={loadSamples} className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40"><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>
           </div>
         ) : (
           <section className="mx-auto w-full min-w-0 max-w-5xl">
@@ -1082,7 +1080,7 @@ export default function Home() {
                   onReview={markReviewed}
                   onRetry={(id) => { void extractSelected([id]); }}
                   busy={busy}
-                  onDiscard={(id) => updateItem(id, (current) => ({ ...current, formValues: { ...(current.savedValues ?? current.formValues) }, errors: {} }))}
+                  onDiscard={discardChanges}
                 />
               ))}
             </div>
@@ -1106,7 +1104,7 @@ export default function Home() {
             onExtract={() => { void extractSelected(); }}
             hasExtractable={items.some((item) => extractableStatuses.includes(item.status))}
             eligibleCount={completeSelectedItems.length}
-            onJson={() => downloadJson("expenses.json", completeSelectedItems.map(buildDownloadPayload))}
+            onJson={() => { downloadJson("expenses.json", completeSelectedItems.map(buildDownloadPayload)); setRemovedToast("JSON export started."); }}
             onDownload={downloadSelected}
           /></div>
         ) : null}

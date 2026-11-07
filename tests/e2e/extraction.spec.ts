@@ -19,7 +19,7 @@ test.describe("receipt extraction queue behavior", () => {
     await uploadReceipt(page);
 
     await extractButton(page, /Extract 1 file/i).click();
-    await expect(page.locator("article").getByText("Reading", {exact:true})).toBeVisible();
+    await expect(page.locator("article").getByText("Extracting", {exact:true})).toBeVisible();
     await expect(page.getByText("0 of 1 processed", {exact:true})).toBeVisible();
     await expect(page.getByText(/FamilyMart · KRW 12000 · 2026-05-11/i)).toBeVisible();
 

@@ -67,8 +67,8 @@ export function CurrencyField({ id, value, error, onChange }: {
       <button type="button" tabIndex={-1} aria-label="Show currencies" aria-expanded={open}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => { if (open) setOpen(false); else { input.current?.focus(); setSearching(false); setActive(-1); setOpen(true); } }}
-        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500">
-        <ChevronDown className="h-4 w-4" aria-hidden="true" />
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-slate-500 hover:bg-slate-100">
+        <ChevronDown className={clsx("h-4 w-4 transition-transform", open && "rotate-180")} aria-hidden="true" />
       </button>
     </div>
     {open && <ul ref={list} id={`${id}-list`} role="listbox" aria-label="Currencies"

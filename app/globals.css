@@ -80,3 +80,23 @@ textarea {
     background-color: #ffffff;
   }
 }
+
+/* Request activity, not a measured percentage. The request state owns its lifetime. */
+@keyframes extractionPending {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.extraction-progress-segment { animation: extractionPending 1.3s linear infinite; }
+
+/* Consistent feedback for every control, without changing its layout or hit target. */
+button:enabled, a { transition: background-color 120ms, color 120ms, box-shadow 120ms, filter 120ms, translate 80ms; }
+button:enabled:hover { filter: brightness(.96); }
+button:enabled:active, a:active { translate: 0 1px; filter: brightness(.9); }
+button:focus-visible, a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+button:disabled { cursor: not-allowed; }
+button[aria-pressed="true"] { background-color: #eff6ff; }
+@media (prefers-reduced-motion: reduce) {
+  .extraction-progress-segment { animation: none; width: 100%; opacity: .65; }
+  button:enabled, a { transition: none; }
+  button:enabled:active, a:active { translate: none; }
+}

@@ -17,7 +17,7 @@ test.describe("responsive receipt queue smoke", () => {
     await expect(page.getByText("Receipt-to-Form", { exact: true })).toBeVisible();
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
-      "AI-assisted receipt extraction with editable human review and reviewed expense CSV export."
+      "Turn receipts into expenses you can review, correct, and export to your spreadsheet."
     );
     await expect(page.locator("main")).toBeVisible();
     await uploadReceipt(page);

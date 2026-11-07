@@ -117,15 +117,15 @@ export function expensesCsv(rows: { id: string; source: string; values: ReceiptF
   }
   return ["receipt ID,source filename,merchant,date,category,currency,total,notes,reviewed timestamp", ...rows.map(({ id, source, values: v, reviewedAt }) => [id, source, v.merchantName, v.date, v.receiptType || "Other", v.currency.trim().toUpperCase(), v.totalAmount, v.notes, reviewedAt].map(cell).join(","))].join("\r\n");
 }
-export function sampleReceipt(merchant: string, actual: string, extracted: string): ReceiptQueueItem {
+export function sampleReceipt(merchant: string, actual: string, extracted: string, note = ""): ReceiptQueueItem {
   const canvas = document.createElement("canvas"); canvas.width = 400; canvas.height = 500;
   const context = canvas.getContext("2d")!;
   context.fillStyle = "#fff"; context.fillRect(0, 0, 400, 500);
   context.fillStyle = "#111"; context.font = "20px monospace";
-  ["SYNTHETIC SAMPLE", merchant, "2026-11-05", "Total USD " + actual].forEach((line, index) => context.fillText(line, 24, 70 + index * 70));
+  ["SAMPLE RECEIPT", merchant, "2026-11-05", "Total USD " + actual].forEach((line, index) => context.fillText(line, 24, 70 + index * 70));
   const bytes = Uint8Array.from(atob(canvas.toDataURL("image/png").split(",")[1]), (c) => c.charCodeAt(0));
   const file = new File([bytes], merchant + ".png", { type: "image/png" });
-  const extraction: ReceiptExtraction = { merchantName: merchant, date: "2026-11-05", totalAmount: Number(extracted), currency: "USD", confidence: actual === extracted ? "high" : "low", receiptType: "Other", notes: ["Synthetic sample. Check total against source image."], items: [] };
+  const extraction: ReceiptExtraction = { merchantName: merchant, date: "2026-11-05", totalAmount: Number(extracted), currency: "USD", confidence: actual === extracted ? "high" : "low", receiptType: "Other", notes: note ? [note] : [], items: [] };
   const formValues = extractionToFormValues(extraction);
   return { id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file), selected: true, expanded: true, status: "needs-review", progress: 100, extraction, formValues, savedValues: { ...formValues }, editedAt: Date.now(), extractedAt: new Date().toISOString(), errors: {}, errorMessage: null, isNewResult: true, resultSeen: false };
 }

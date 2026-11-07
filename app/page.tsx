@@ -367,7 +367,7 @@ function ExpandedReceiptDetails({
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <div>
-              <p className="text-xs font-semibold text-slate-700">Model</p>
+              <p className="text-xs font-semibold text-slate-700">Extraction</p>
               <p className="mt-1 text-sm capitalize text-slate-600">{item.extraction?.confidence ?? "Not extracted"} confidence</p>
             </div>
             {item.extraction?.notes.length && item.extraction.notes.join("\n") !== item.formValues.notes ? <div>
@@ -504,7 +504,7 @@ function ReceiptQueueItemRow({
   onSeen: (id: string) => void;
 }) {
   const complete = isCompleteItem(item);
-  const hasLeftEdge = ["extracted", "needs-review", "failed", "edited"].includes(item.status);
+  const hasLeftEdge = item.status === "failed" || Object.keys(item.errors).length > 0;
   const canShowProcessedActions = !["ready", "extracting"].includes(item.status);
   const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
     if (!canShowProcessedActions) return;
@@ -525,12 +525,12 @@ function ReceiptQueueItemRow({
     <article
       onMouseEnter={() => onSeen(item.id)}
       className={clsx(
-        "relative overflow-hidden rounded-r-2xl rounded-l-none border bg-white transition-colors duration-300",
-        item.status === "ready" && "border-slate-200",
+        "relative overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors duration-300",
+        !complete && !hasLeftEdge && item.status !== "extracting" && "border-slate-200",
         item.status === "extracting" && "border-blue-200",
-        item.status === "extracted" && item.isNewResult && "animate-completeFlash border-emerald-200",
-        item.status === "edited" && "border-emerald-200",
-        item.status === "needs-review" && item.isNewResult && "animate-reviewFlash border-rose-200",
+        complete && "border-emerald-200",
+        Object.keys(item.errors).length > 0 && "border-rose-200",
+
         item.status === "failed" && "border-rose-200"
       )}
     >
@@ -613,7 +613,7 @@ function ReceiptQueueItemRow({
 
       {item.selected && !item.extraction && <p className="border-t border-slate-100 px-4 py-2 text-sm text-slate-600">Excluded from export — {item.status === "failed" ? "retry extraction, then review" : item.status === "extracting" ? "extraction is in progress" : "extract this receipt, then review"}.</p>}
       {item.extraction && <div className="border-t border-slate-200 px-4 py-3 space-y-2 text-sm">
-        {item.selected && !complete && <p className="text-slate-600">Excluded from export — {JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "save or discard changes" : "correct errors and mark reviewed"}.</p>}
+        {item.selected && !complete && <p className="text-slate-600">{JSON.stringify(item.savedValues) !== JSON.stringify(item.formValues) ? "Save or discard changes before export." : Object.keys(item.errors).length ? "Resolve the highlighted fields before export." : "Mark reviewed to include in export."}</p>}
         <div className="flex flex-wrap gap-2 [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40">
           <button aria-label="Save changes" title="Save changes" onClick={() => onSave(item.id)}><Save className="h-4 w-4" aria-hidden="true" /></button>
           <button aria-label="Discard changes" title="Discard changes" onClick={() => onDiscard(item.id)}><RotateCcw className="h-4 w-4" aria-hidden="true" /></button>
@@ -675,7 +675,6 @@ function FloatingBatchFooter({
           <p className="text-sm font-semibold text-slate-700">{selectedCount} selected</p>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm">{eligibleCount} eligible</span>
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
             <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.14)] focus:outline-none focus:ring-2 focus:ring-emerald-500" title="Only current reviewed receipts can be exported.">
               <Download className="mr-2 inline h-4 w-4" aria-hidden="true" />Export expenses CSV ({eligibleCount})
@@ -992,11 +991,17 @@ export default function Home() {
       <AppHeader />
       <section className="mx-auto max-w-5xl px-4 py-6 space-y-3 text-sm [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:rounded-lg [&_button]:border [&_button]:border-slate-300 [&_button]:bg-white [&_button]:px-3 [&_button]:py-2 [&_button]:font-semibold [&_button:disabled]:opacity-40 [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-blue-500">
         <h1 className="text-2xl font-bold">Turn receipts into expense records</h1>
-        <p>Live extraction sends images to Gemini. Receipts stay on this device for 7 days after editing; browser storage may be cleared.</p>
+        <p className="max-w-2xl text-slate-600">Receipt images are sent to an AI provider for extraction.</p>
+        <details className="max-w-2xl text-xs text-slate-500">
+          <summary className="w-fit cursor-pointer rounded py-1 underline-offset-4 hover:text-slate-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Privacy &amp; storage</summary>
+          <p className="pt-2 leading-relaxed">Live extraction uses Google Gemini. Samples stay in your browser without a provider request. Receipts and edits are saved in this browser for seven days after your last edit. Browser storage may be cleared; export anything you need to keep.</p>
+        </details>
+        <div className="flex flex-wrap items-center gap-2">
         <button aria-label="Try two sample receipts" title="Try two sample receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}><FlaskConical className="mr-2 inline h-4 w-4" aria-hidden="true" />Samples</button>
-        <button aria-label="Clear saved receipts" title="Clear saved receipts" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+        {(items.length > 0 || errorMessage) && <button aria-label="Clear saved receipts" title="Clear saved receipts" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}
         {addingFiles && <p role="status">Checking selected receipts…</p>}
         {busy && <button onClick={() => { stopRequested.current = true; }}><Square className="mr-2 inline h-4 w-4" aria-hidden="true" />Stop remaining work</button>}
+        </div>
         {legacy && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3">You are recovering receipts saved at the old address. Finish reviewing and export them here. Saved work stays here until cleared or expired. <a className="underline font-semibold" href="https://receipt-to-form-syahmiharith.vercel.app/">Open the main app</a></div>}
       </section>
       <main className="min-h-[calc(100vh-151px)] px-4 pb-28 pt-5 sm:px-6 lg:px-8">

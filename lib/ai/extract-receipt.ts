@@ -94,16 +94,16 @@ function extractJsonText(rawText: string) {
   return withoutFence.slice(firstBrace, lastBrace + 1);
 }
 
-function getGeminiPublicErrorMessage(status: number, providerMessage?: string) {
+function getGeminiPublicErrorMessage(status: number) {
   if (status === 429) {
-    return "Gemini is rate limiting extraction requests right now. Please wait a minute, then retry the failed receipt.";
+    return "The extraction service is rate limiting extraction requests right now. Please wait a minute, then retry the failed receipt.";
   }
 
   if (status === 500 || status === 502 || status === 503 || status === 504) {
-    return "Gemini is temporarily unavailable or overloaded. Please retry the failed receipt in a moment.";
+    return "The extraction service is temporarily unavailable or overloaded. Please retry the failed receipt in a moment.";
   }
 
-  return providerMessage || "Gemini extraction request failed.";
+  return "Extraction is unavailable. Try sample receipts or contact the project owner.";
 }
 
 function buildNeedsReviewFallback(note: string): ReceiptExtraction {
@@ -186,10 +186,10 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new ReceiptExtractionError("AI_PROVIDER_ERROR", "Gemini extraction timed out. Please try again.", 504);
+      throw new ReceiptExtractionError("AI_PROVIDER_ERROR", "Extraction timed out. Please try again.", 504);
     }
 
-    throw new ReceiptExtractionError("AI_PROVIDER_ERROR", "Gemini extraction request failed.", 502);
+    throw new ReceiptExtractionError("AI_PROVIDER_ERROR", "Extraction failed.", 502);
   } finally {
     clearTimeout(timeout);
   }
@@ -199,7 +199,7 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
   if (!geminiResponse.ok) {
     const error = new ReceiptExtractionError(
       "AI_PROVIDER_ERROR",
-      getGeminiPublicErrorMessage(geminiResponse.status, geminiJson.error?.message),
+      getGeminiPublicErrorMessage(geminiResponse.status),
       geminiResponse.status
     );
     const providerStatus = geminiJson.error?.status;
@@ -216,7 +216,7 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
 
   if (!modelText) {
     return buildNeedsReviewFallback(
-      "Gemini returned an empty response. Please inspect the receipt image and enter the fields manually."
+      "The extraction service returned an empty response. Please inspect the receipt image and enter the fields manually."
     );
   }
 
@@ -225,13 +225,13 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
   } catch (error) {
     if (error instanceof ReceiptExtractionError) {
       return buildNeedsReviewFallback(
-        "Gemini did not return structured receipt JSON. Please inspect the image and enter the fields manually."
+        "Some details could not be read. Please inspect the image and enter the fields manually."
       );
     }
 
     throw new ReceiptExtractionError(
       "INVALID_AI_RESPONSE",
-      error instanceof Error ? error.message : "Gemini returned an invalid response.",
+      error instanceof Error ? error.message : "The extraction service returned an invalid response.",
       502
     );
   }

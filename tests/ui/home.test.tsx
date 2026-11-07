@@ -13,7 +13,7 @@ async function uploadFiles(files: File[]) {
   await waitFor(() => expect(screen.getByRole("button", { name: "Try samples" })).toBeEnabled());
   const input = document.querySelector('input[type="file"]') as HTMLInputElement | null;
   if (!input) throw new Error("File input was not found");
-  fireEvent.change(input, { target: { files } });
+  await act(async () => { fireEvent.change(input, { target: { files } }); });
   if (files[0]?.type === "image/png") await screen.findByText(files[0].name);
 }
 

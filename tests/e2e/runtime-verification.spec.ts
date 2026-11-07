@@ -83,6 +83,10 @@ test("receipt preview traps focus and closes with Escape", async ({ page }) => {
   await expect(dialog.getByRole("button", { name: "Zoom out", exact: true })).toBeVisible();
   const viewer = dialog.getByRole("region", {name:"Receipt image viewer"});
   await expect.poll(() => viewer.evaluate(el => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight)).toBe(true);
+  await viewer.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await expect.poll(() => viewer.evaluate(el => el.scrollLeft > 0 || el.scrollTop > 0)).toBe(true);
   await viewer.evaluate(el => el.scrollTo(el.scrollWidth, el.scrollHeight));
   expect(await viewer.evaluate(el => el.scrollLeft > 0 || el.scrollTop > 0)).toBe(true);
   await page.keyboard.press("Escape");

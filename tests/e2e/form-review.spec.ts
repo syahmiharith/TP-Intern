@@ -30,7 +30,8 @@ test.describe("receipt review and validation", () => {
     await fillReviewFields(page);
     await saveChanges(page);
 
-    await expect(page.getByText(/Review required/i).first()).toBeVisible();
+    await expect(page.locator("article").getByText("Needs review", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export expenses CSV (0)", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
     await expect(page.getByRole("button", { name: "Export expenses CSV (1)" })).toBeVisible();
   });
@@ -55,7 +56,8 @@ test.describe("receipt review and validation", () => {
     await saveChanges(page);
 
     await expect(page.getByText("Merchant name is required.")).toBeHidden();
-    await expect(page.getByText(/Review required/i).first()).toBeVisible();
+    await expect(page.locator("article").getByText("Needs review", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export expenses CSV (0)", exact: true })).toBeDisabled();
   });
 
   test("rejects invalid amount and currency before accepting corrected values", async ({ page }) => {
@@ -78,6 +80,7 @@ test.describe("receipt review and validation", () => {
     await typeTextInput(currencyInput(page), "USD");
     await saveChanges(page);
 
-    await expect(page.getByText(/Review required/i).first()).toBeVisible();
+    await expect(page.locator("article").getByText("Needs review", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export expenses CSV (0)", exact: true })).toBeDisabled();
   });
 });

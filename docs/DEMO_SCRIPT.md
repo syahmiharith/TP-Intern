@@ -3,7 +3,7 @@
 Open https://receipt-to-form-syahmiharith.vercel.app.
 
 1. Point out upload as the main action and the optional sample button. Live extraction sends images to Gemini.
-2. Choose **Try two sample receipts**. Both receipts appear in the existing queue. The stationery image shows USD 28.00 while its initial extraction says 23.00.
+2. Choose **Samples**. Both receipts appear in the existing queue. The stationery image shows USD 28.00 while its initial extraction says 23.00.
 3. Compare the stationery image with its form and correct the total to 28.00.
 4. Use **Save changes**, then **Mark reviewed**, within that receipt card. Original low model confidence stays visible independently.
 5. Change the reviewed total again. The card shows unsaved changes and the batch CSV export is blocked for that receipt.

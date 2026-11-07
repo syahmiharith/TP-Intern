@@ -287,7 +287,21 @@ describe("POST /api/extract-receipt", () => {
 
     expect(response.status).toBe(429);
     expect(body.code).toBe("AI_PROVIDER_ERROR");
-    expect(body.error).toContain("Gemini is rate limiting");
+    expect(body.error).toContain("Too many requests.");
+  });
+
+  it("keeps provider branding and raw diagnostics out of public errors", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false, status: 403,
+      json: async () => ({ error: { message: "Gemini project access denied: private provider diagnostic", status: "PERMISSION_DENIED" } })
+    })));
+    const response = await POST(createRequest(createImageFile()));
+    const body = await readJson(response);
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("AI_PROVIDER_ERROR");
+    expect(body.error).not.toMatch(/Gemini|private provider diagnostic/i);
+    expect(body.error).toContain("Try sample receipts");
   });
 
   it("normalizes common Gemini JSON shape drift instead of failing extraction", async () => {
@@ -335,7 +349,7 @@ describe("POST /api/extract-receipt", () => {
 
     expect(response.status).toBe(504);
     expect(body.code).toBe("AI_PROVIDER_ERROR");
-    expect(body.error).toBe("Gemini extraction timed out. Please try again.");
+    expect(body.error).toBe("Extraction timed out. Please try again.");
   });
 
   it("returns a safe public message for unexpected failures", async () => {
@@ -396,7 +410,7 @@ describe("POST /api/extract-receipt", () => {
       totalAmount: null,
       currency: null,
       confidence: "low",
-      notes: ["Gemini did not return structured receipt JSON. Please inspect the image and enter the fields manually."],
+      notes: ["Some details could not be read. Please inspect the image and enter the fields manually."],
       items: []
     });
   });
@@ -421,11 +435,11 @@ describe("POST /api/extract-receipt", () => {
     expect(body.data).toMatchObject({
       confidence: "low",
       notes: [
-        "Gemini returned an empty response. Please inspect the receipt image and enter the fields manually."
+        "No details could be read. Check the image and enter the fields manually."
       ]
     });
     expect(JSON.stringify(body.data)).toContain(
-      "Gemini returned an empty response. Please inspect the receipt image and enter the fields manually."
+      "No details could be read. Check the image and enter the fields manually."
     );
   });
 });

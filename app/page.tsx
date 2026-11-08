@@ -1,4 +1,6 @@
 "use client";
+import { AutoGrowTextarea } from "./components/auto-grow-textarea";
+import { receiptDisplayNotes } from "@/lib/receipt-notes";
 import { InlineImage } from "./components/inline-image";
 import { SearchField } from "./components/search-field";
 import { extractionItems, lineItemErrors, type EditableLineItem } from "@/lib/line-items";
@@ -367,8 +369,7 @@ function ReceiptInsights({item,onLineChange,onAddLine,onRemoveLine}: {
   onAddLine:(id:string)=>void; onRemoveLine:(id:string,index:number)=>void;
 }) {
   if(!item.extraction)return null;
-  const notes=item.formValues.notes.split("\n").map(note=>note.trim()).filter(Boolean);
-  const originalNotes=item.extraction.notes.filter(note=>!notes.includes(note.trim()));
+  const {notes,originalNotes}=receiptDisplayNotes(item.formValues.notes,item.extraction.notes);
   const lines=itemLines(item);
   return <div className="space-y-4">
     <section aria-label="Receipt notes" className="space-y-2">
@@ -417,25 +418,25 @@ function EditableField({
   onFieldChange: (id: string, field: keyof ReceiptFormValues, value: string) => void;
 }) {
   const error = receiptErrors(item)[field];
-
+  const control = {
+    id: `${item.id}-${field}`,
+    "aria-label": label,
+    autoComplete: "off",
+    value: item.formValues[field],
+    "aria-invalid": Boolean(error),
+    "aria-describedby": error ? `${item.id}-${field}-error` : undefined,
+    className: clsx(
+      "min-h-11 w-full min-w-0 rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
+      error ? "border-rose-300 bg-rose-50" : "border-slate-200"
+    )
+  };
   return (
-    <label className="block min-w-0 space-y-1" htmlFor={`${item.id}-${field}`}>
+    <label className="block min-w-0 space-y-1" htmlFor={control.id}>
       <span className="text-xs font-semibold text-slate-700">{label}</span>
-      <input
-        id={`${item.id}-${field}`}
-        aria-label={label}
-        type={type}
-        inputMode={inputMode}
-        autoComplete="off"
-        value={item.formValues[field]}
-        onChange={(event) => onFieldChange(item.id, field, event.target.value)}
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? `${item.id}-${field}-error` : undefined}
-        className={clsx(
-          "min-h-11 w-full min-w-0 rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
-          error ? "border-rose-300 bg-rose-50" : "border-slate-200"
-        )}
-      />
+      {field === "merchantName" ? <AutoGrowTextarea {...control}
+        className={clsx(control.className,"block resize-none overflow-hidden [overflow-wrap:anywhere]")}
+        onChange={event=>onFieldChange(item.id,field,event.target.value)} /> :
+        <input {...control} type={type} inputMode={inputMode} onChange={event=>onFieldChange(item.id,field,event.target.value)} />}
       {error ? <p id={`${item.id}-${field}-error`} className="text-xs font-medium text-rose-600">{error}</p> : null}
     </label>
   );

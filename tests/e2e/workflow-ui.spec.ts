@@ -76,3 +76,34 @@ test('queue stopping preserves completed receipts and unprocessed work',async({p
 test('long filenames stay inside a 360px row and selection is borderless',async({page})=>{
  await page.setViewportSize({width:360,height:900});await gotoHome(page);await uploadReceipts(page,[{name:'Expense-receipt-with-an-extended-filename-for-the-monthly-finance-review.png',mimeType:'image/png',buffer:Buffer.from('longname')}]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);const button=page.locator('article').getByRole('button',{name:/^Deselect /});await expect(button).toHaveCSS('border-width','0px');await button.click();await expect(page.locator('article').getByRole('button',{name:/^Select /})).toHaveCSS('border-width','0px');
 });
+
+for (const width of [375, 768, 1280]) {
+ test(`merchant wraps, grows and shrinks without changing its value at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:900});await gotoHome(page);
+  await page.getByRole('button',{name:'Try samples',exact:true}).click();
+  const merchant=page.getByRole('textbox',{name:'Merchant Name',exact:true}).first();
+  const shortHeight=(await merchant.boundingBox())!.height;
+  expect(shortHeight).toBeGreaterThanOrEqual(44);expect(shortHeight).toBeLessThanOrEqual(46);
+  const long='North Street Specialty Coffee and Bakery Collective, International Markets and Events Division — Downtown Riverside Branch '.repeat(4).trim();
+  await merchant.fill(long);
+  await expect.poll(async()=>(await merchant.boundingBox())!.height).toBeGreaterThan(shortHeight);
+  expect(await merchant.evaluate(el=>el.scrollHeight<=el.clientHeight+1&&el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await expect(merchant).toHaveValue(long);
+  await merchant.fill('Cafe');await expect.poll(async()=>(await merchant.boundingBox())!.height).toBeLessThanOrEqual(shortHeight+1);
+  await merchant.fill(long);
+  await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{const open=indexedDB.open('receipt-expenses');open.onsuccess=()=>{const db=open.result;const tx=db.transaction('batches','readonly');const get=tx.objectStore('batches').get('current');get.onsuccess=()=>resolve(get.result.items[0].formValues.merchantName);tx.oncomplete=()=>db.close();};}))).toBe(long);
+  await page.reload();await expect(merchant).toHaveValue(long);await expect.poll(async()=>(await merchant.boundingBox())!.height).toBeGreaterThan(shortHeight);
+  if(width===375){const mobileHeight=(await merchant.boundingBox())!.height;await page.setViewportSize({width:1280,height:900});await expect.poll(async()=>(await merchant.boundingBox())!.height).toBeLessThan(mobileHeight);await expect(merchant).toHaveValue(long);}
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ });
+}
+
+test('duplicate note lines appear once without changing saved or original content',async({page})=>{
+ const notes=['Tax included.\nCheck the date.',' tax  included ','• CHECK THE DATE.'];
+ await mockExtractionResponse(page,{...highConfidenceExtraction,notes});await gotoHome(page);await uploadReceipts(page,[await createGeneratedReceiptPng(page)]);
+ await page.getByRole('button',{name:'Extract 1 file',exact:true}).click();const row=page.locator('article');await expect(row.getByTestId('receipt-status')).toHaveText('Ready');await row.getByRole('button',{name:/^Expand /}).click();
+ await expect(row.getByRole('list',{name:'Notes',exact:true}).getByRole('listitem')).toHaveText(['Tax included.','Check the date.']);
+ await expect(row.getByRole('list',{name:'Extraction notes',exact:true})).toHaveCount(0);
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export JSON',exact:true}).click();
+ const [record]=JSON.parse(await readFile((await(await download).path())!,'utf8'));expect(record.originalExtraction.notes).toEqual(notes);expect(record.values.notes).toBe(notes.join('\n'));
+});

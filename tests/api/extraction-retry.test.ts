@@ -19,6 +19,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   resetGeminiQuotaCacheForTests();
   vi.stubEnv("GEMINI_API_KEY", "test-key");
+  // Explicitly exercise compatibility with legacy model configurations.
+  vi.stubEnv("GEMINI_MODEL", "gemini-2.5-flash");
   budget.mockReset().mockResolvedValue(null);
   resetReceiptExtractionRateLimitForTests();
 });
@@ -113,4 +115,8 @@ it("rechecks the primary when the provider cooldown expires within the same Paci
 });
 it("never makes a third attempt if a daily-quota fallback encounters a transient failure",async()=>{
  const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>Response.json({error:{status:"UNAVAILABLE"}},{status:503}));vi.stubGlobal("fetch",fetch);const pending=POST(request());await vi.runAllTimersAsync();expect((await pending).status).toBe(503);expect(fetch).toHaveBeenCalledTimes(2);expect(budget).toHaveBeenCalledTimes(2);
+});
+
+it("defaults to the verified current Gemini primary when no model is configured",async()=>{
+ vi.stubEnv("GEMINI_MODEL","");const fetch=vi.fn().mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);expect((await POST(request())).status).toBe(200);expect(fetch.mock.calls[0][0]).toContain("/gemini-3.1-flash-lite:");
 });

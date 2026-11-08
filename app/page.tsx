@@ -1,4 +1,5 @@
 "use client";
+import { ExportMenu } from "./components/export-menu";
 import { ArchivePicker } from "./components/archive-picker";
 import { isZip, maxArchiveBytes, type ArchiveSource } from "@/lib/receipt-archive";
 import { AutoGrowTextarea } from "./components/auto-grow-textarea";
@@ -23,7 +24,6 @@ import {
   RotateCw,
   ZoomIn,
   ZoomOut,
-  Download,
   Square,
   Sparkles,
   Check,
@@ -491,7 +491,6 @@ function FloatingBatchFooter({
   selectedCount,
   canAddMore,
   canExtractSelected,
-  extractCount,
   canDownloadSelected,
   onSelectToggle,
   onFiles,
@@ -500,13 +499,13 @@ function FloatingBatchFooter({
   eligibleCount,
   onJson,
   busy,
-  hasExtractable
+  hasExtractable,
+  hasInvalidExtraction
 }: {
   fileCount: number;
   selectedCount: number;
   canAddMore: boolean;
   canExtractSelected: boolean;
-  extractCount: number;
   canDownloadSelected: boolean;
   onSelectToggle: () => void;
   onFiles: (files: FileList | null) => void;
@@ -516,6 +515,7 @@ function FloatingBatchFooter({
   onJson: () => void;
   busy: boolean;
   hasExtractable: boolean;
+  hasInvalidExtraction: boolean;
 }) {
   const hasMultipleFiles = fileCount > 1;
 
@@ -525,30 +525,29 @@ function FloatingBatchFooter({
         {hasMultipleFiles ? (
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm font-semibold text-slate-700">
-              {fileCount} / {maxFiles} files · {selectedCount} selected
+              {fileCount} / {maxFiles} files · {selectedCount} selected · {eligibleCount} ready
             </p>
             <button type="button" disabled={busy} onClick={onSelectToggle} className="min-h-11 disabled:opacity-40 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
               {selectedCount === fileCount ? "Deselect all" : "Select all"}
             </button>
           </div>
         ) : (
-          <p className="text-sm font-semibold text-slate-700">{selectedCount} selected</p>
+          <p className="text-sm font-semibold text-slate-700">{selectedCount} selected · {eligibleCount} ready</p>
         )}
         <div className="flex flex-wrap items-center gap-2">
           <AddFileButton canAddMore={canAddMore} onFiles={onFiles} />
-            <button type="button" disabled={!canDownloadSelected} onClick={onDownload} className="min-h-11 rounded-xl border border-slate-900 bg-slate-950 px-3 py-2 text-sm font-bold text-white transition enabled:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40" title={canDownloadSelected ? "Export selected expenses" : "Select a valid receipt to export"}>
-              <Download className="mr-2 inline h-4 w-4" aria-hidden="true" />Export expenses CSV ({eligibleCount})
-            </button>
-          {canDownloadSelected && <button aria-label="Export JSON" title="Export provenance JSON" onClick={onJson} className="min-h-11 min-w-11 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">JSON</button>}
-          {(hasExtractable || busy) && <button
+          {(hasExtractable || hasInvalidExtraction || busy) && <button
             type="button"
             disabled={!canExtractSelected}
             onClick={onExtract}
-            className={clsx("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed", busy ? "bg-blue-50 text-blue-700" : "bg-blue-600 text-white enabled:hover:bg-blue-700 disabled:bg-slate-300 disabled:opacity-40")}
+            aria-busy={busy}
+            title={busy ? "Extracting selected receipts" : canExtractSelected ? "Extract selected receipts" : hasExtractable ? "Select queued or failed receipts to extract" : "Correct receipt fields to continue"}
+            className={clsx("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed", busy ? "bg-blue-50 text-blue-700" : "bg-blue-600 text-white enabled:hover:bg-blue-700 disabled:bg-slate-300 disabled:opacity-40")}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-            {busy ? "Extracting…" : canExtractSelected ? `Extract ${extractCount} ${extractCount === 1 ? "file" : "files"}` : "Extract"}
+            Extract
           </button>}
+          <ExportMenu disabled={!canDownloadSelected} onCsv={onDownload} onJson={onJson}/>
         </div>
       </div>
     </div>
@@ -991,7 +990,6 @@ export default function Home() {
             selectedCount={selectedItems.length}
             canAddMore={canAddMore && hydrated && !busy}
             canExtractSelected={!busy && !addingFiles && !archives && selectedExtractableItems.length > 0}
-            extractCount={selectedExtractableItems.length}
             canDownloadSelected={completeSelectedItems.length > 0}
             onSelectToggle={() => {
               const shouldSelect = selectedItems.length !== items.length;
@@ -1000,6 +998,7 @@ export default function Home() {
             onFiles={prepareFiles}
             onExtract={() => { void extractSelected(); }}
             hasExtractable={items.some((item) => extractableStatuses.includes(item.status))}
+            hasInvalidExtraction={items.some((item) => Boolean(item.extraction) && !isExportable(item))}
             eligibleCount={completeSelectedItems.length}
             onJson={() => { downloadJson("expenses.json", completeSelectedItems.map(buildDownloadPayload)); setRemovedToast("JSON export started."); }}
             onDownload={downloadSelected}

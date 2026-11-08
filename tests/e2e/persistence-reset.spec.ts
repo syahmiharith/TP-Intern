@@ -43,6 +43,6 @@ test.describe("receipt queue item controls", () => {
 
     await page.getByRole("button", { name: /Select all/i }).click();
     await expect(page.getByText(/2 selected/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Extract 2 files/i })).toBeEnabled();
+    await expect(page.getByRole("button", { name: /^Extract$/i })).toBeEnabled();
   });
 });

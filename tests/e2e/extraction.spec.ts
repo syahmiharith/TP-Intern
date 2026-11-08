@@ -18,7 +18,7 @@ test.describe("receipt extraction queue behavior", () => {
     await gotoHome(page);
     await uploadReceipt(page);
 
-    await extractButton(page, /Extract 1 file/i).click();
+    await extractButton(page, /^Extract$/i).click();
     await expect(page.locator("article").getByText("Extracting", {exact:true})).toBeVisible();
     await expect(page.getByText("0 of 1 processed", {exact:true})).toBeVisible();
     await expect(page.locator("article").getByText("Ready", {exact:true})).toBeVisible();
@@ -44,10 +44,10 @@ test.describe("receipt extraction queue behavior", () => {
       await mockExtractionResponse(page, extraction);
       await gotoHome(page);
       await uploadReceipt(page);
-      await extractButton(page, /Extract 1 file/i).click();
+      await extractButton(page, /^Extract$/i).click();
 
       await expect(page.locator("article").getByText("Ready",{exact:true})).toBeVisible();
-    await expect(page.getByRole("button", { name: "Export expenses CSV (1)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
     });
   }
 
@@ -55,7 +55,7 @@ test.describe("receipt extraction queue behavior", () => {
     await mockExtractionResponse(page, lowConfidenceExtraction);
     await gotoHome(page);
     await uploadReceipt(page);
-    await extractButton(page, /Extract 1 file/i).click();
+    await extractButton(page, /^Extract$/i).click();
 
     await expect(page.getByText(/Needs attention/i)).toBeVisible();
 
@@ -79,12 +79,12 @@ test.describe("receipt extraction queue behavior", () => {
 
       await gotoHome(page);
       await uploadReceipt(page);
-      await extractButton(page, /Extract 1 file/i).click();
+      await extractButton(page, /^Extract$/i).click();
 
       await expect(page.getByText(/Failed/i)).toBeVisible();
       await page.getByRole("button",{name:`Expand ${defaultReceiptFile.name}`,exact:true}).click();
       await expect(page.getByText(message)).toBeVisible();
-      await expect(page.getByRole("button", { name: /Extract 1 file/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /^Extract$/i })).toBeVisible();
     });
   }
 
@@ -97,11 +97,11 @@ test.describe("receipt extraction queue behavior", () => {
     ]);
 
     await page.getByRole("button", { name: /Deselect second-receipt.png/i }).click();
-    await extractButton(page, /Extract 1 file/i).click();
+    await extractButton(page, /^Extract$/i).click();
     await expect(page.locator("article").getByText("Ready", {exact:true})).toBeVisible();
 
     await page.getByRole("button", { name: /Select second-receipt.png/i }).click();
-    await extractButton(page, /Extract 1 file/i).click();
+    await extractButton(page, /^Extract$/i).click();
 
     expect(calls).toHaveLength(2);
   });

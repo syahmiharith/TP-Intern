@@ -175,7 +175,7 @@ export async function runMockedExtraction(page: Page, extraction = highConfidenc
   await mockExtractionResponse(page, extraction);
   await gotoHome(page);
   await uploadReceipt(page);
-  await extractButton(page, /Extract 1 file/i).click();
+  await extractButton(page, /^Extract$/i).click();
 }
 
 export async function expandCurrentReceipt(page: Page, fileName = defaultReceiptFile.name) {

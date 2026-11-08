@@ -1,3 +1,4 @@
+import {chooseExport} from './support/actions';
 import {test,expect} from '@playwright/test';
 import {zipSync} from 'fflate';
 import {readFile} from 'node:fs/promises';
@@ -11,10 +12,10 @@ for(const width of [375,768,1280]){
   const picker=page.getByRole('region',{name:'Files in ZIP',exact:true});await expect(picker).toBeVisible();await expect(picker.getByRole('heading',{name:'Files in ZIP',exact:true})).toBeFocused();await expect(picker.getByRole('checkbox')).toHaveCount(4);await expect(picker.getByRole('checkbox',{name:'receipts.zip: notes.txt',exact:true})).toBeDisabled();await expect(picker.getByRole('checkbox',{name:'receipts.zip: nested.zip',exact:true})).toBeDisabled();expect(calls).toBe(0);await expect(page.locator('article')).toHaveCount(0);
   const choice=picker.getByRole('checkbox',{name:`receipts.zip: ${path}`,exact:true});await choice.focus();await page.keyboard.press('Space');await expect(choice).toBeChecked();await expect(picker.getByRole('button',{name:'Add 1 image',exact:true})).toBeEnabled();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await picker.getByRole('button',{name:'Add 1 image',exact:true}).click();await expect(picker).toHaveCount(0);await expect(page.locator('article')).toHaveCount(1);await expect(page.locator('article')).toContainText(path);expect(calls).toBe(0);
-  await page.getByRole('button',{name:'Extract 1 file',exact:true}).click();await expect(page.locator('article').getByTestId('receipt-status')).toHaveText('Ready');expect(calls).toBe(1);
+  await page.getByRole('button',{name:'Extract',exact:true}).click();await expect(page.locator('article').getByTestId('receipt-status')).toHaveText('Ready');expect(calls).toBe(1);
   await page.locator('article').getByRole('button',{name:`Expand ${path}`,exact:true}).click();await expect(page.getByAltText(`Inline preview of ${path}`)).toBeVisible();await page.getByLabel('Total Amount',{exact:true}).fill('12500');
   await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{const open=indexedDB.open('receipt-expenses');open.onsuccess=()=>{const db=open.result;const tx=db.transaction('batches','readonly');const get=tx.objectStore('batches').get('current');get.onsuccess=()=>resolve(get.result.items[0].formValues.totalAmount);tx.oncomplete=()=>db.close();};}))).toBe('12500');
-  await page.reload();await expect(page.getByLabel('Total Amount',{exact:true})).toHaveValue('12500');const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export expenses CSV (1)',exact:true}).click();const csv=await readFile((await(await download).path())!,'utf8');expect(csv).toContain(path);expect(csv).toContain('12500');
+  await page.reload();await expect(page.getByLabel('Total Amount',{exact:true})).toHaveValue('12500');const download=page.waitForEvent('download');await chooseExport(page,'CSV');const csv=await readFile((await(await download).path())!,'utf8');expect(csv).toContain(path);expect(csv).toContain('12500');
  });
 }
 
@@ -38,5 +39,5 @@ test('direct images and multiple ZIP files share one batch',async({page})=>{
 
 test('an unreadable ZIP does not discard independent image uploads',async({page})=>{
  await gotoHome(page);const image=await createGeneratedReceiptPng(page);await page.locator('input[type=file]').first().setInputFiles([image,{name:'broken.zip',mimeType:'application/zip',buffer:Buffer.from('invalid')}]);
- await expect(page.locator('article')).toHaveCount(1);await expect(page.locator('article')).toContainText(image.name);await expect(page.getByRole('main').getByRole('alert')).toContainText('broken.zip: Could not open this ZIP');await expect(page.getByRole('button',{name:'Extract 1 file',exact:true})).toBeEnabled();
+ await expect(page.locator('article')).toHaveCount(1);await expect(page.locator('article')).toContainText(image.name);await expect(page.getByRole('main').getByRole('alert')).toContainText('broken.zip: Could not open this ZIP');await expect(page.getByRole('button',{name:'Extract',exact:true})).toBeEnabled();
 });

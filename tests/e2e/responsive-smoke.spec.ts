@@ -21,10 +21,10 @@ test.describe("responsive receipt queue smoke", () => {
     );
     await expect(page.locator("main")).toBeVisible();
     await uploadReceipt(page);
-    await extractButton(page, /Extract 1 file/i).click();
+    await extractButton(page, /^Extract$/i).click();
 
     await expect(page.locator("article").getByText("Ready",{exact:true})).toBeVisible();
-    await expect(page.getByRole("button", { name: "Export expenses CSV (1)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
 
     await expandCurrentReceipt(page);
     await expect(page.getByRole("table", { name: "Extracted items" })).toBeVisible();

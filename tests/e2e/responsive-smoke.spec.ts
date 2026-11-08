@@ -17,18 +17,17 @@ test.describe("responsive receipt queue smoke", () => {
     await expect(page.getByText("Receipt-to-Form", { exact: true })).toBeVisible();
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
-      "Turn receipts into expenses you can review, correct, and export to your spreadsheet."
+      "Turn receipt images into editable expenses and line items, saved as you type and ready for CSV export."
     );
     await expect(page.locator("main")).toBeVisible();
     await uploadReceipt(page);
     await extractButton(page, /Extract 1 file/i).click();
 
-    await expect(page.getByText(/FamilyMart · KRW 12000 · 2026-05-11/i)).toBeVisible();
-    await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
+    await expect(page.locator("article").getByText("Ready",{exact:true})).toBeVisible();
     await expect(page.getByRole("button", { name: "Export expenses CSV (1)" })).toBeVisible();
 
     await expandCurrentReceipt(page);
     await expect(page.getByRole("table", { name: "Extracted items" })).toBeVisible();
-    await expect(page.getByText("Coffee")).toBeVisible();
+    await expect(page.getByLabel("Item 1 name",{exact:true})).toHaveValue("Coffee");
   });
 });

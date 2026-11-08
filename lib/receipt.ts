@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { currentCurrencies } from "./currencies";
+import { currencyMinorUnits } from "./line-items";
 
 export const allowedReceiptImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 export const maxReceiptImageSizeBytes = 5 * 1024 * 1024;
@@ -132,7 +133,7 @@ export function validateReceiptForm(values: ReceiptFormValues) {
 
   const currency = values.currency.trim().toUpperCase();
   if (!currentCurrencies.some((entry) => entry.code === currency) && !Intl.supportedValuesOf("currency").includes(currency)) errors.currency = "Choose a recognized currency code.";
-  const digits = currentCurrencies.find((entry) => entry.code === currency)?.minorUnits ?? new Intl.NumberFormat("en", { style: "currency", currency: /^[A-Z]{3}$/.test(currency) ? currency : "USD" }).resolvedOptions().maximumFractionDigits ?? 2;
+  const digits = currencyMinorUnits(currency);
   if ((values.totalAmount.split(".")[1]?.length ?? 0) > digits) errors.totalAmount = "Too many decimal places for this currency.";
   return errors;
 }

@@ -21,14 +21,14 @@ test.describe("receipt extraction queue behavior", () => {
     await extractButton(page, /Extract 1 file/i).click();
     await expect(page.locator("article").getByText("Extracting", {exact:true})).toBeVisible();
     await expect(page.getByText("0 of 1 processed", {exact:true})).toBeVisible();
-    await expect(page.getByText(/FamilyMart · KRW 12000 · 2026-05-11/i)).toBeVisible();
+    await expect(page.locator("article").getByText("Ready", {exact:true})).toBeVisible();
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method()).toBe("POST");
     expect(calls[0].headers()["content-type"]).toContain("multipart/form-data");
   });
 
-  for (const { name, extraction, summary } of [
+  for (const { name, extraction } of [
     {
       name: "high-confidence extraction",
       extraction: highConfidenceExtraction,
@@ -46,8 +46,7 @@ test.describe("receipt extraction queue behavior", () => {
       await uploadReceipt(page);
       await extractButton(page, /Extract 1 file/i).click();
 
-      await expect(page.getByText(summary)).toBeVisible();
-      await page.getByRole("button", { name: "Mark reviewed", exact: true }).click();
+      await expect(page.locator("article").getByText("Ready",{exact:true})).toBeVisible();
     await expect(page.getByRole("button", { name: "Export expenses CSV (1)" })).toBeVisible();
     });
   }
@@ -58,8 +57,8 @@ test.describe("receipt extraction queue behavior", () => {
     await uploadReceipt(page);
     await extractButton(page, /Extract 1 file/i).click();
 
-    await expect(page.getByText(/Needs review/i)).toBeVisible();
-    await expect(page.getByText(/Unknown merchant · MYR — · —/i)).toBeVisible();
+    await expect(page.getByText(/Needs attention/i)).toBeVisible();
+
     await expect(page.getByRole("button", { name: /Download result/i })).toBeHidden();
 
     await expandCurrentReceipt(page);
@@ -83,6 +82,7 @@ test.describe("receipt extraction queue behavior", () => {
       await extractButton(page, /Extract 1 file/i).click();
 
       await expect(page.getByText(/Failed/i)).toBeVisible();
+      await page.getByRole("button",{name:`Expand ${defaultReceiptFile.name}`,exact:true}).click();
       await expect(page.getByText(message)).toBeVisible();
       await expect(page.getByRole("button", { name: /Extract 1 file/i })).toBeVisible();
     });
@@ -98,7 +98,7 @@ test.describe("receipt extraction queue behavior", () => {
 
     await page.getByRole("button", { name: /Deselect second-receipt.png/i }).click();
     await extractButton(page, /Extract 1 file/i).click();
-    await expect(page.getByText(/FamilyMart · KRW 12000 · 2026-05-11/i)).toBeVisible();
+    await expect(page.locator("article").getByText("Ready", {exact:true})).toBeVisible();
 
     await page.getByRole("button", { name: /Select second-receipt.png/i }).click();
     await extractButton(page, /Extract 1 file/i).click();

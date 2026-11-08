@@ -2,14 +2,12 @@
 
 Open https://receipt-to-form-syahmiharith.vercel.app.
 
-1. Point out upload as the main action and the optional sample button. Live extraction sends images to an external AI service; provider and storage details are in the footer.
-2. Choose **Try samples**. Both receipts appear in the existing queue. The stationery image shows USD 28.00 while its initial extraction says 23.00.
-3. Compare the stationery image with its form and correct the total to 28.00.
-4. Use **Save changes**, then **Mark reviewed**, within that receipt card. Original low model confidence stays visible independently.
-5. Change the reviewed total again. The card shows unsaved changes and the batch CSV export is blocked for that receipt.
-6. Refresh, verify the pending correction returns, then use **Discard changes** to restore the saved reviewed 28.00 revision.
-7. Use the batch toolbar's single **Export expenses CSV** action. Open the file and check total, receipt ID, source filename and review timestamp. Secondary **Export JSON** includes original extraction and reviewed values.
-8. Optionally upload a synthetic receipt into the same queue and extract it. Explain visible retry/stop controls if the provider is unavailable.
-9. On a narrow screen, switch between form and image and use the same card actions. Preview supports keyboard focus, Escape, zoom and rotation.
+1. Choose optional **Try samples**, or upload supported synthetic receipts and extract them.
+2. Expand a receipt. Fields, immutable bullet notes, editable items and the interactive image are available together. Collapsed rows have one status pill and compact controls.
+3. Correct the stationery total to 28.00. Changes save automatically; valid selected receipts export immediately. No approval or manual save step.
+4. Edit item names, quantities and prices. Inspect the image using zoom, rotation and panning. Item edits do not silently overwrite receipt totals.
+5. Refresh to confirm corrections remain. An invalid amount updates field errors and export counts; correcting it restores eligibility.
+6. Export expenses CSV from the single batch toolbar. Check current values, source identity and the appended `items` column. Secondary JSON contains current values/items and unchanged original model output/confidence.
+7. Mix samples and uploads, retry an individual failure or stop the remaining queue. Successful receipts remain available.
 
-Saved receipts are local to this address/device and expire seven days after editing. The legacy address retains existing saved receipts for recovery; finish and export there before clearing and continuing to the branded app. No participant outcomes are claimed by this demonstration.
+Work stays on this address/device and expires seven days after editing. Privacy and storage details are in the footer. The legacy address retains saved work for recovery. No participant outcomes are claimed by this demonstration.

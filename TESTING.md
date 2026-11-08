@@ -1,5 +1,7 @@
 # Testing Guide
 
+Current workflow: valid receipts export directly. Edits auto-save, including line-item strings; there is no approval or manual-save step. See [current release checks](docs/REVIEW_GUIDE.md).
+
 This project uses layered tests so the application can be reviewed with confidence without depending on Gemini uptime for every run.
 
 ## Test Layers
@@ -11,7 +13,7 @@ This project uses layered tests so the application can be reviewed with confiden
 | Production build | `npm run build` | Verify the app compiles for Vercel. |
 | Unit tests | `npm run test:unit` | Test receipt schema, normalization, completion, and form validation logic. |
 | API tests | `npm run test:api` | Test `/api/extract-receipt` with mocked Gemini responses. |
-| UI tests | `npm run test:ui` | Test upload, queue state, extraction states, review, validation, and download visibility. |
+| UI tests | `npm run test:ui` | Test upload, queue state, extraction states, live editing, validation, and download visibility. |
 | Mocked E2E tests | `npm run test:e2e` | Test full browser flows with deterministic mocked extraction responses. |
 | Live Gemini E2E smoke | `npm run test:e2e:live` | Optional real Gemini smoke using local env files. |
 | Production audit | `npm run audit:prod` | Check runtime dependency vulnerabilities. |
@@ -114,8 +116,8 @@ Covers:
 - Delete behavior and preview URL cleanup.
 - Footer extraction controls.
 - Successful extraction summary and download visibility.
-- Partial low-confidence extraction becoming `Needs review`.
-- Inline receipt preview inside the review panel.
+- Partial low-confidence extraction becoming `Needs attention`.
+- Interactive inline receipt image beside the editor.
 - Manual corrections changing a result to `Edited`.
 - Preview modal behavior.
 
@@ -149,7 +151,7 @@ The default E2E suite mocks `/api/extract-receipt` and covers:
 - Selected-file extraction.
 - Extracting row state and progress.
 - High, medium, and low confidence extraction responses.
-- `Needs review` manual correction flow.
+- Live validation and direct export after correction.
 - API 400, 429, and 500 failure states.
 - Failed rows remaining retryable.
 - Processed rows skipped during selected extraction.
@@ -190,7 +192,7 @@ Before a release or demonstration, manually test with at least:
 
 1. A clear Malaysian receipt with MYR.
 2. A clear Korean receipt with KRW.
-3. A difficult or blurry receipt to confirm `Needs review`.
+3. A difficult or blurry receipt to confirm `Needs attention`.
 
 Manual acceptance checklist:
 

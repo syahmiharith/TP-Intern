@@ -108,7 +108,7 @@ export function currencyInput(page: Page) {
 }
 
 export function receiptTypeInput(page: Page) {
-  return page.getByLabel("Receipt Type");
+  return page.getByRole("combobox", {name:"Receipt Type",exact:true});
 }
 
 export async function typeTextInput(locator: Locator, value: string) {
@@ -202,14 +202,11 @@ export async function expectFormValues(
 
 export async function fillReviewFields(page: Page) {
   await typeTextInput(merchantNameInput(page), "Manual Cafe");
-  await receiptTypeInput(page).selectOption("Food & Beverage");
+  await receiptTypeInput(page).fill("Food");
+  await receiptTypeInput(page).press("Enter");
   await dateInput(page).fill("2026-05-11");
   await totalAmountInput(page).fill("15.50");
   await typeTextInput(currencyInput(page), "MYR");
-}
-
-export async function saveChanges(page: Page) {
-  await page.getByRole("button", { name: /Save changes/i }).click();
 }
 
 export async function createGeneratedReceiptPng(page: Page) {

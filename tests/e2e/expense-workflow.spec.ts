@@ -2,49 +2,27 @@ import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { storedImageCount } from "./support/receipt";
 
-test("reviewed corrections survive refresh and CSV uses current reviewed values", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Try samples" }).click();
-  await page.getByRole("button", { name: "Mark reviewed", exact: true }).nth(1).click();
-  const total = page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1);
-  await total.fill("28.00");
-  await expect(page.locator("article").nth(1).getByText("Unsaved changes", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export expenses CSV (0)", exact: true })).toBeDisabled();
-  await page.waitForTimeout(300);
-  await page.reload();
-  await expect(page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1)).toHaveValue("28.00");
-  await page.locator("article").nth(1).getByRole("button", { name: "Save changes", exact: true }).click();
-  await page.getByRole("button", { name: "Mark reviewed", exact: true }).nth(1).click();
-  const reviewedRow = page.locator("article").nth(1);
-  await expect(reviewedRow.getByText("Reviewed", { exact: true })).toBeVisible();
-  await expect(reviewedRow.getByRole("heading", { name: "Review Required", exact: true })).toBeHidden();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export expenses CSV (1)", exact: true }).click();
-  const file = await download;
-  const csv = await readFile((await file.path())!, "utf8");
-  expect(csv).toContain('"28.00"');
-  expect(csv).toContain('"Sample stationery.png"');
-  await expect(page.getByText(/^Extraction confidence low$/i)).toBeVisible();
-  await page.getByRole("spinbutton", { name: "Total Amount", exact: true }).nth(1).fill("30.00");
-  await page.locator("article").nth(1).getByRole("button", { name: "Discard changes", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Export expenses CSV (1)", exact: true })).toBeEnabled();
+test("live corrections survive refresh and export without review",async({page})=>{
+ await page.goto("/");await page.getByRole("button",{name:"Try samples"}).click();
+ await page.getByRole("button",{name:"Deselect Sample cafe.png",exact:true}).click();
+ const row=page.locator("article").nth(1);const total=row.getByLabel("Total Amount",{exact:true});
+ await expect(page.getByRole("button",{name:"Export expenses CSV (1)",exact:true})).toBeEnabled();
+ await total.fill("0");await expect(page.getByRole("button",{name:"Export expenses CSV (0)",exact:true})).toBeDisabled();
+ await total.fill("28.00");await page.waitForTimeout(300);await page.reload();
+ await expect(total).toHaveValue("28.00");await expect(row.getByText("Extraction confidence low",{exact:true})).toBeVisible();
+ const pending=page.waitForEvent("download");await page.getByRole("button",{name:"Export expenses CSV (1)",exact:true}).click();
+ const csv=await readFile((await(await pending).path())!,"utf8");expect(csv).toContain('"28.00"');expect(csv).toContain('"Sample stationery.png"');
+ const jsonPending=page.waitForEvent("download");await page.getByRole("button",{name:"Export JSON",exact:true}).click();
+ const [record]=JSON.parse(await readFile((await(await jsonPending).path())!,"utf8"));
+ expect(record.values.totalAmount).toBe("28.00");expect(record.originalExtraction.confidence).toBe("low");expect(csv).toContain(record.receiptId);
+ await expect(page.getByRole("button",{name:/Mark reviewed|Save changes|Discard changes/})).toHaveCount(0);
 });
-
-for (const width of [375, 768, 1280]) {
-  test(`sample review fits ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
-    await page.getByRole("button", { name: "Try samples" }).click();
-    await expect(page.getByRole("textbox", { name: "Merchant Name", exact: true }).first()).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    if (width < 1024) {
-      await page.getByRole("button", { name: "Show receipt image", exact: true }).first().click();
-      await expect(page.getByAltText("Inline preview of Sample cafe.png")).toBeVisible();
-      await page.getByRole("button", { name: "Show form", exact: true }).first().click();
-    }
-    await page.screenshot({ path: `/tmp/receipt-${width}.png`, fullPage: true });
-  });
-}
+for(const width of [375,768,1280])test(`all receipt details fit ${width}px`,async({page})=>{
+ await page.setViewportSize({width,height:900});await page.goto("/");await page.getByRole("button",{name:"Try samples"}).click();
+ const row=page.locator("article").first();await expect(row.getByLabel("Merchant Name",{exact:true})).toBeVisible();
+ await expect(row.getByAltText("Inline preview of Sample cafe.png")).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
 
 test("deletion persists and unavailable storage is explained", async ({ page }) => {
   await page.goto("/");
@@ -105,7 +83,7 @@ test("mixed batch retries failures without replacing successful receipts", async
     { name: "second.png", mimeType: "image/png", buffer: Buffer.from("second") }
   ]);
   await page.getByRole("button", { name: "Extract 2 files", exact: true }).click();
-  await expect(page.getByText("Provider unavailable", { exact: true })).toBeVisible();
+  await expect(page.locator("article").nth(1).getByText("Failed", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Extract 1 file", exact: true }).click();
   await expect(page.getByText("Provider unavailable", { exact: true })).toHaveCount(0);
   expect(calls).toBe(3);

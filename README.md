@@ -1,6 +1,9 @@
 # Receipt-to-Form
 
-Gemini-powered receipt extraction and human-review web app. The app turns receipt images into structured, reviewable data through a CloudConvert-style processing queue: upload receipts, extract selected files, review uncertain fields, and export reviewed expenses as CSV with secondary provenance JSON.
+> Current workflow: automatic saving and direct export. Expand a row for all fields, immutable notes, editable line items and interactive image controls. No Save, Discard or Mark reviewed step. See [Release checks](docs/REVIEW_GUIDE.md) and [Demo script](docs/DEMO_SCRIPT.md). Older review-gate release notes below are historical.
+
+
+Receipt-to-Form turns receipt images into editable expenses and line items. Corrections save automatically, and valid selected receipts export directly as CSV with secondary provenance JSON.
 
 **Run the app:** follow [Getting Started](#getting-started).
 
@@ -16,9 +19,9 @@ Gemini-powered receipt extraction and human-review web app. The app turns receip
 
 1. Upload one to five JPG, PNG or WebP receipts, or choose the optional samples.
 2. Extract uploaded receipts and compare each result with its image.
-3. Correct fields as needed. Use **Save changes** after editing, then **Mark reviewed** within the receipt card. Unchanged receipts can be reviewed directly.
-4. Use the batch toolbar's **Export expenses CSV** to download the reviewed selected receipts. **Export JSON** retains original model provenance.
-5. Editing blocks export until you save and review again. **Discard changes** restores the saved revision and review status. Refresh restores pending corrections on the same address and device.
+3. Expand a row to correct fields and edit item names, quantities and prices. Changes save automatically; no approval or manual Save action is required.
+4. Use the batch toolbar's **Export expenses CSV** for valid selected receipts and current line items. **Export JSON** retains original provenance.
+5. Invalid fields exclude a receipt until corrected. Refresh restores current corrections and line items. Model confidence remains unchanged and never gates export.
 
 The branded address above is the main entry. The older tp-intern-malaysia address keeps a recovery workflow for existing saved receipts; finish and export there before clearing them and continuing to the main app.
 
@@ -30,7 +33,7 @@ Key product decisions:
 
 - AI creates the first draft; the user remains responsible for uncertain or incomplete fields.
 - Batch queue UX supports up to five receipts while keeping extraction sequential to reduce quota risk.
-- Export requires valid saved fields and an explicit human review of that revision.
+- Export uses current valid fields and line items, without an approval gate.
 - The backend stays small: one secure `POST /api/extract-receipt` route handles validation, rate limiting, and Gemini calls.
 
 ## What I Built
@@ -40,15 +43,15 @@ Key product decisions:
 - Auto-selection for newly uploaded files.
 - Preview modal for every uploaded receipt.
 - Selected-file extraction with sequential API calls.
-- Item-level extracting, extracted, needs-review, failed, and edited states.
+- One row status: queued, extracting, ready, needs attention or failed.
 - Bottom-edge progress indicator and left-edge result status indicator.
 - Receipt type classification.
 - Extraction of merchant name, date, total amount, currency, confidence, notes, and line items.
 - Editable details panel for manual correction.
-- Inline receipt preview inside `Needs review` details so users can compare the image while fixing fields.
+- Zoom, rotate and pan the inline image beside the expanded editor.
 - Red validation states for missing required fields.
-- CSV export only for saved, reviewed results.
-- Secondary batch JSON retains original extraction and reviewed values.
+- CSV exports current valid selected receipts and appends a structured `items` column.
+- Version-2 JSON separates current values/items, original extraction and historical review metadata.
 
 ## Engineering Signals
 
@@ -57,7 +60,7 @@ Key product decisions:
 | API key safety | Gemini key is used only in the server-side API route. |
 | Input validation | File type and size are checked before extraction. |
 | Output validation | Gemini output is parsed, normalized, and validated with Zod. |
-| Human review | Low-confidence or incomplete results become `Needs review`. |
+| Direct export | Valid values can export at any confidence level. Invalid data is flagged inline. |
 | Abuse protection | Shared limits allow 15 calls per IP per minute and 100 provider calls per UTC day. |
 | Test strategy | Default tests mock Gemini for deterministic CI. |
 | Real integration | Optional live Gemini Playwright smoke test validates the real API path. |

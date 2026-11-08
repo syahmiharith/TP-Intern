@@ -1,6 +1,6 @@
 # Receipt-to-Form
 
-> Current workflow: automatic saving and direct export. Expand a row for all fields, immutable notes, editable line items and interactive image controls. No Save, Discard or Mark reviewed step. See [Release checks](docs/REVIEW_GUIDE.md) and [Demo script](docs/DEMO_SCRIPT.md). Older review-gate release notes below are historical.
+> Designed, built and maintained by [Zulsyahmi Zulkefli](https://portfolio-syahmiharith.vercel.app). [Product case study](https://portfolio-syahmiharith.vercel.app/work/receipt-to-form) · [Release checks](docs/REVIEW_GUIDE.md) · [Demo script](docs/DEMO_SCRIPT.md). Older review-gate release notes below are historical.
 
 
 Receipt-to-Form turns receipt images into editable expenses and line items. Corrections save automatically, and valid selected receipts export directly as CSV with secondary provenance JSON.
@@ -18,16 +18,16 @@ Receipt-to-Form turns receipt images into editable expenses and line items. Corr
 ## Quick Path
 
 1. Upload one to five JPG, PNG or WebP receipts, select images from a ZIP, or choose the optional samples.
-2. Extract uploaded receipts and compare each result with its image.
+2. Extract uploaded receipts and compare each result with its image. If a request fails, **Extract** retries selected failed receipts without re-extracting successful results or replacing their corrections.
 3. Expand a row to correct fields and edit item names, quantities and prices. Changes save automatically; no approval or manual Save action is required.
 4. Use **Export → CSV** in the batch toolbar for valid selected receipts and current line items. **Export → JSON** retains original provenance.
 5. Invalid fields exclude a receipt until corrected. Refresh restores current corrections and line items. Model confidence remains unchanged and never gates export.
 
 The branded address above is the main entry. The older tp-intern-malaysia address keeps a recovery workflow for existing saved receipts; finish and export there before clearing them and continuing to the main app.
 
-## Why This Is More Than An API Call
+## Product decisions
 
-The workflow combines receipt upload, generative AI extraction, editable review, and structured output in a human-in-the-loop extraction queue.
+I designed the workflow around one useful outcome: expense records that match the values on screen. Import, extraction, corrections, recovery and export stay in the same workspace.
 
 Key product decisions:
 
@@ -53,7 +53,7 @@ Key product decisions:
 - CSV exports current valid selected receipts and appends a structured `items` column.
 - Version-2 JSON separates current values/items, original extraction and historical review metadata.
 
-## Engineering Signals
+## Implementation
 
 | Area | Implementation |
 | --- | --- |

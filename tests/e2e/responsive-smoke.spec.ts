@@ -13,11 +13,11 @@ test.describe("responsive receipt queue smoke", () => {
     await mockExtractionResponse(page, highConfidenceExtraction);
     await gotoHome(page);
 
-    await expect(page).toHaveTitle("Receipt-to-Form");
+    await expect(page).toHaveTitle("Receipt-to-Form | Receipt to CSV & JSON");
     await expect(page.getByText("Receipt-to-Form", { exact: true })).toBeVisible();
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
-      "Turn receipt images into editable expenses and line items, saved as you type and ready for CSV export."
+      "Turn receipt images and ZIPs into editable expenses and line items. Correct details, resume saved work, and export CSV or JSON. No account needed."
     );
     await expect(page.locator("main")).toBeVisible();
     await uploadReceipt(page);

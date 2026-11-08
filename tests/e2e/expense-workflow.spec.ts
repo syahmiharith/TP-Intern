@@ -70,12 +70,20 @@ test("expired saved receipts are removed on return", async ({ page }) => {
   await expect.poll(() => storedImageCount(page)).toBe(0);
 });
 
-test("mixed batch retries failures without replacing successful receipts", async ({ page }) => {
-  let calls = 0;
+test("batch Extract retries only failures and preserves successful corrections after refresh", async ({ page }) => {
+  const calls = new Map<string, number>();
   await page.route("**/api/extract-receipt", async (route) => {
-    calls += 1;
-    if (calls === 2) { await route.fulfill({ status: 503, json: { error: "Provider unavailable" } }); return; }
-    await route.fulfill({ json: { data: { merchantName: "Cafe", receiptType: "Other", date: "2026-11-05", totalAmount: 12, currency: "USD", confidence: "low", notes: [], items: [] } } });
+    const filename = route.request().postDataBuffer()!.toString().match(/filename="([^"]+)"/)![1];
+    const attempt = (calls.get(filename) ?? 0) + 1;
+    calls.set(filename, attempt);
+    if (filename === "second.png" && attempt < 3) {
+      await route.fulfill({ status: 503, json: { error: "Temporary extraction failure" } });
+      return;
+    }
+    await route.fulfill({ json: {
+      data: { merchantName: filename === "first.png" ? "Original cafe" : "Second shop", receiptType: "Other", date: "2026-11-05", totalAmount: 12, currency: "USD", confidence: "low", notes: [], items: [] },
+      requestId: `request-${filename}`, extractedAt: "2026-11-08T00:00:00.000Z"
+    } });
   });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Try samples" })).toBeEnabled();
@@ -83,10 +91,47 @@ test("mixed batch retries failures without replacing successful receipts", async
     { name: "first.png", mimeType: "image/png", buffer: Buffer.from("first") },
     { name: "second.png", mimeType: "image/png", buffer: Buffer.from("second") }
   ]);
-  await page.getByRole("button", { name: "Extract", exact: true }).click();
-  await expect(page.locator("article").nth(1).getByText("Failed", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Extract", exact: true }).click();
-  await expect(page.getByText("Provider unavailable", { exact: true })).toHaveCount(0);
-  expect(calls).toBe(3);
-  await expect(page.getByText("first.png", { exact: true })).toBeVisible();
+  const extract = page.getByRole("button", { name: "Extract", exact: true });
+  const first = page.locator("article").nth(0);
+  const second = page.locator("article").nth(1);
+  await extract.click();
+  await expect(first.getByTestId("receipt-status")).toHaveText("Ready");
+  await expect(second.getByTestId("receipt-status")).toHaveText("Failed");
+  await first.getByRole("button", { name: "Expand first.png", exact: true }).click();
+  await first.getByLabel("Merchant Name", { exact: true }).fill("Corrected cafe");
+  await first.getByLabel("Total Amount", { exact: true }).fill("28.00");
+  async function jsonExport() {
+    const pending = page.waitForEvent("download");
+    await chooseExport(page, 'JSON');
+    return JSON.parse(await readFile((await (await pending).path())!, "utf8"));
+  }
+  const [before] = await jsonExport();
+  await page.waitForTimeout(300);
+  await page.reload();
+  await expect(first.getByLabel("Total Amount", { exact: true })).toHaveValue("28.00");
+  await expect(extract).toBeEnabled();
+  await extract.click();
+  await expect.poll(() => calls.get("second.png")).toBe(2);
+  await expect(second.getByTestId("receipt-status")).toHaveText("Failed");
+  await expect(extract).toBeEnabled();
+  expect(calls.get("first.png")).toBe(1);
+  expect((await jsonExport())[0]).toEqual(before);
+  await extract.click();
+  await expect(second.getByTestId("receipt-status")).toHaveText("Ready");
+  await expect(extract).toHaveCount(0);
+  expect(Object.fromEntries(calls)).toEqual({ "first.png": 1, "second.png": 3 });
+  const records = await jsonExport();
+  expect(records).toHaveLength(2);
+  expect(records[0]).toEqual(before);
+  expect(records[0].values.merchantName).toBe("Corrected cafe");
+  expect(records[0].values.totalAmount).toBe("28.00");
+  expect(records[0].originalExtraction.totalAmount).toBe(12);
+  expect(records[0].originalExtraction.confidence).toBe("low");
+  const pending = page.waitForEvent("download");
+  await chooseExport(page, 'CSV');
+  const csv = await readFile((await (await pending).path())!, "utf8");
+  expect(csv).toContain(before.receiptId);
+  expect(csv).toContain('"Corrected cafe"');
+  expect(csv).toContain('"28.00"');
+  expect(csv).toContain('"Second shop"');
 });

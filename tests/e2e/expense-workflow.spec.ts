@@ -1,3 +1,4 @@
+import {chooseExport} from './support/actions';
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { storedImageCount } from "./support/receipt";
@@ -6,13 +7,13 @@ test("live corrections survive refresh and export without review",async({page})=
  await page.goto("/");await page.getByRole("button",{name:"Try samples"}).click();
  await page.getByRole("button",{name:"Deselect Sample cafe.png",exact:true}).click();
  const row=page.locator("article").nth(1);const total=row.getByLabel("Total Amount",{exact:true});
- await expect(page.getByRole("button",{name:"Export expenses CSV (1)",exact:true})).toBeEnabled();
- await total.fill("0");await expect(page.getByRole("button",{name:"Export expenses CSV (0)",exact:true})).toBeDisabled();
+ await expect(page.getByRole("button",{name:"Export",exact:true})).toBeEnabled();
+ await total.fill("0");await expect(page.getByRole("button",{name:"Export",exact:true})).toBeDisabled();
  await total.fill("28.00");await page.waitForTimeout(300);await page.reload();
  await expect(total).toHaveValue("28.00");await expect(row.getByText("Extraction confidence low",{exact:true})).toBeVisible();
- const pending=page.waitForEvent("download");await page.getByRole("button",{name:"Export expenses CSV (1)",exact:true}).click();
+ const pending=page.waitForEvent("download");await chooseExport(page,'CSV');
  const csv=await readFile((await(await pending).path())!,"utf8");expect(csv).toContain('"28.00"');expect(csv).toContain('"Sample stationery.png"');
- const jsonPending=page.waitForEvent("download");await page.getByRole("button",{name:"Export JSON",exact:true}).click();
+ const jsonPending=page.waitForEvent("download");await chooseExport(page,'JSON');
  const [record]=JSON.parse(await readFile((await(await jsonPending).path())!,"utf8"));
  expect(record.values.totalAmount).toBe("28.00");expect(record.originalExtraction.confidence).toBe("low");expect(csv).toContain(record.receiptId);
  await expect(page.getByRole("button",{name:/Mark reviewed|Save changes|Discard changes/})).toHaveCount(0);
@@ -82,9 +83,9 @@ test("mixed batch retries failures without replacing successful receipts", async
     { name: "first.png", mimeType: "image/png", buffer: Buffer.from("first") },
     { name: "second.png", mimeType: "image/png", buffer: Buffer.from("second") }
   ]);
-  await page.getByRole("button", { name: "Extract 2 files", exact: true }).click();
+  await page.getByRole("button", { name: "Extract", exact: true }).click();
   await expect(page.locator("article").nth(1).getByText("Failed", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Extract 1 file", exact: true }).click();
+  await page.getByRole("button", { name: "Extract", exact: true }).click();
   await expect(page.getByText("Provider unavailable", { exact: true })).toHaveCount(0);
   expect(calls).toBe(3);
   await expect(page.getByText("first.png", { exact: true })).toBeVisible();

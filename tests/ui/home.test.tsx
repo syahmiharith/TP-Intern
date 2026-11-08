@@ -93,7 +93,7 @@ describe("Home page receipt queue", () => {
     expect(screen.getByText("receipt-1.png")).toBeInTheDocument();
     expect(screen.getByText("receipt-2.png")).toBeInTheDocument();
     expect(screen.getByText(/2 selected/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Extract 2 files" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Extract" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: /Extract receipt-1.png/i })).not.toBeInTheDocument();
   });
 
@@ -112,9 +112,9 @@ describe("Home page receipt queue", () => {
   it("exports a valid extraction directly without a review step", async () => {
     vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({data:completeExtraction})})));
     render(<Home />); await uploadFiles([createImageFile("aeon-receipt.png")]);
-    fireEvent.click(screen.getByRole("button",{name:"Extract 1 file"}));
+    fireEvent.click(screen.getByRole("button",{name:"Extract"}));
     await screen.findByText("Ready");
-    expect(screen.getByRole("button",{name:"Export expenses CSV (1)"})).toBeEnabled();
+    expect(screen.getByRole("button",{name:"Export"})).toBeEnabled();
     expect(screen.queryByRole("button",{name:"Mark reviewed"})).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Merchant Name")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Expand aeon-receipt.png"}));
@@ -124,21 +124,21 @@ describe("Home page receipt queue", () => {
 
   it("preserves three-decimal totals in the live editor", async()=>{
     vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({data:{...completeExtraction,currency:"KWD",totalAmount:1.234}})})));
-    render(<Home/>);await uploadFiles([createImageFile("precision.png")]);fireEvent.click(screen.getByRole("button",{name:"Extract 1 file"}));
+    render(<Home/>);await uploadFiles([createImageFile("precision.png")]);fireEvent.click(screen.getByRole("button",{name:"Extract"}));
     await screen.findByText("Ready");fireEvent.click(screen.getByRole("button",{name:"Expand precision.png"}));
     expect(screen.getByLabelText("Total Amount")).toHaveValue("1.234");
-    expect(screen.getByRole("button",{name:"Export expenses CSV (1)"})).toBeEnabled();
+    expect(screen.getByRole("button",{name:"Export"})).toBeEnabled();
   });
 
   it("updates validation and export eligibility while typing",async()=>{
     vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({data:partialExtraction})})));
-    render(<Home/>);await uploadFiles([createImageFile("blurry-receipt.png")]);fireEvent.click(screen.getByRole("button",{name:"Extract 1 file"}));
+    render(<Home/>);await uploadFiles([createImageFile("blurry-receipt.png")]);fireEvent.click(screen.getByRole("button",{name:"Extract"}));
     await screen.findByText("Needs attention");fireEvent.click(screen.getByRole("button",{name:"Expand blurry-receipt.png"}));
     expect(screen.getByText("Merchant name is required.")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Merchant Name"),{target:{value:"AEON Wellness"}});
     fireEvent.change(screen.getByLabelText("Date"),{target:{value:"2026-05-12"}});
     fireEvent.change(screen.getByLabelText("Total Amount"),{target:{value:"43.80"}});
-    expect(screen.getByRole("button",{name:"Export expenses CSV (1)"})).toBeEnabled();
+    expect(screen.getByRole("button",{name:"Export"})).toBeEnabled();
     expect(screen.queryByRole("button",{name:/Save changes|Mark reviewed|Discard changes/})).not.toBeInTheDocument();
   });
 

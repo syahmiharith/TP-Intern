@@ -1,3 +1,4 @@
+import {chooseExport} from './support/actions';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { createGeneratedReceiptPng, gotoHome, uploadReceipt, extractButton, expandCurrentReceipt } from './support/receipt';
@@ -9,18 +10,18 @@ test('deployed real-provider extraction through reviewed CSV', async ({ page, ba
   await gotoHome(page);
   await uploadReceipt(page, await createGeneratedReceiptPng(page));
   let responsePromise = page.waitForResponse(r => r.url().includes('/api/extract-receipt'));
-  await extractButton(page, /Extract 1 file/i).click();
+  await extractButton(page, /^Extract$/i).click();
   let response = await responsePromise;
   console.log(JSON.stringify({ status: response.status(), requestId: response.headers()['x-request-id'] }));
   if (response.status() === 503) {
-    await expect(page.getByRole('button', { name: 'Extract 1 file', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Extract', exact: true })).toBeEnabled();
     await info.attach('provider-transient-failure', {
       body: JSON.stringify({ status: 503, requestId: response.headers()['x-request-id'], recovery: 'explicit user retry' }),
       contentType: 'application/json'
     });
     await page.waitForTimeout(2000);
     responsePromise = page.waitForResponse(r => r.url().includes('/api/extract-receipt'));
-    await extractButton(page, /Extract 1 file/i).click();
+    await extractButton(page, /^Extract$/i).click();
     response = await responsePromise;
     console.log(JSON.stringify({ retryStatus: response.status(), requestId: response.headers()['x-request-id'] }));
   }
@@ -33,16 +34,16 @@ test('deployed real-provider extraction through reviewed CSV', async ({ page, ba
   await page.getByLabel('Currency', { exact: true }).fill('MYR');
   await page.getByLabel('Total Amount', { exact: true }).fill('22.80');
   const csvDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export expenses CSV (1)', exact: true }).click();
+  await chooseExport(page,'CSV');
   const csv = await readFile((await (await csvDownload).path())!, 'utf8');
   expect(csv).toContain('"22.80"');
   expect(csv).toContain('"live-gemini-receipt.png"');
   const jsonDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+  await chooseExport(page,'JSON');
   const records = JSON.parse(await readFile((await (await jsonDownload).path())!, 'utf8'));
   expect(records[0].originalExtraction.confidence).toBe(confidence);
   expect(csv).toContain(records[0].receiptId);
   expect(records[0].values.totalAmount).toBe('22.80');
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Export expenses CSV (1)', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeEnabled();
 });

@@ -1,3 +1,4 @@
+import {chooseExport} from './support/actions';
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { createGeneratedReceiptPng, gotoHome } from "./support/receipt";
@@ -25,7 +26,7 @@ test("real PNG JPEG and WebP receipts complete one reviewed expense batch", asyn
     { name: "synthetic.webp", mimeType: "image/webp", buffer: Buffer.from(encoded[1].split(",")[1], "base64") }
   ];
   await page.locator('input[type="file"]').first().setInputFiles(files);
-  await page.getByRole("button", { name: "Extract 3 files", exact: true }).click();
+  await page.getByRole("button", { name: "Extract", exact: true }).click();
   await expect(page.getByText("3 of 3 processed", { exact: true })).toBeVisible({ timeout: 150000 });
   await expect(page.locator("article").getByText("Ready", { exact: true })).toHaveCount(3);
   for (const file of files) {
@@ -38,7 +39,7 @@ test("real PNG JPEG and WebP receipts complete one reviewed expense batch", asyn
     await row.getByLabel("Total Amount", { exact: true }).fill("22.80");
   }
   const pending = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export expenses CSV (3)", exact: true }).click();
+  await chooseExport(page,'CSV');
   const csv = await readFile((await (await pending).path())!, "utf8");
   for (const file of files) expect(csv).toContain(`"${file.name}"`);
   expect(csv.match(/"22\.80"/g)).toHaveLength(3);

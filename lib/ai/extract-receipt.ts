@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { ReceiptExtraction, ExtractionErrorCode, receiptExtractionSchema } from "@/lib/receipt";
 import { normalizeReceiptExtraction } from "@/lib/receipt-normalizer";
 
@@ -153,7 +152,8 @@ export async function extractReceiptFromImage(options: ExtractReceiptOptions): P
   const attemptOptions = { ...options, timeoutMs: options.timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS };
   const fallback=options.fallbackModel;
   const canFallback=Boolean(fallback && fallback!==options.model && /^gemini-[a-zA-Z0-9._-]+$/.test(fallback));
-  const cacheKey=`${options.model}:${createHash("sha256").update(options.apiKey).digest("hex").slice(0,16)}`;
+  // Each deployment has one configured Google project. Never store credentials in the quota cache.
+  const cacheKey=options.model;
   const day=quotaDay.format(new Date());
   const unavailable=dailyQuotaModels.get(cacheKey);
   const cached=canFallback && unavailable?.day===day && (!unavailable.until||unavailable.until>Date.now());

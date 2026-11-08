@@ -65,7 +65,7 @@ it("logs only bounded quota metadata and retry delay without provider message or
  const response=await POST(request());expect(response.status).toBe(429);
  const failure=warning.mock.calls.find(call=>call[0]==="[receipt-extraction] extraction failed")![1];
  expect(failure).toMatchObject({retryAfterSeconds:13,providerQuota:[{metric:"generativelanguage.googleapis.com/generate_content_free_tier_requests",limit:"GenerateRequestsPerMinutePerProjectPerModel-FreeTier",value:"2"}]});
- expect(JSON.stringify(failure)).not.toContain("private provider message");expect(JSON.stringify(failure)).not.toContain("private-project");expect(JSON.stringify(await response.json())).not.toContain("providerQuota");
+ expect(JSON.stringify(failure)).not.toContain("test-key");expect(JSON.stringify(failure)).not.toContain("private provider message");expect(JSON.stringify(failure)).not.toContain("private-project");expect(JSON.stringify(await response.json())).not.toContain("providerQuota");
 });
 
 it("ignores malformed quota details while preserving the original provider failure",async()=>{

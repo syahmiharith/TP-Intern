@@ -79,12 +79,12 @@ function dailyQuota(value="20",limit="GenerateRequestsPerDayPerProjectPerModel-F
 it("uses one budgeted Gemini fallback for a proven model daily quota",async()=>{
  const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockResolvedValueOnce(success());vi.stubGlobal("fetch",fetch);
  expect((await POST(request())).status).toBe(200);expect(fetch).toHaveBeenCalledTimes(2);expect(budget).toHaveBeenCalledTimes(2);
- expect(fetch.mock.calls[0][0]).toContain("/gemini-2.5-flash:");expect(fetch.mock.calls[1][0]).toContain("/gemini-2.5-flash-lite:");
+ expect(fetch.mock.calls[0][0]).toContain("/gemini-2.5-flash:");expect(fetch.mock.calls[1][0]).toContain("/gemini-3.1-flash-lite:");
 });
 it("does not keep contacting a model with a known exhausted daily quota",async()=>{
  const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);
  expect((await POST(request())).status).toBe(200);expect((await POST(request())).status).toBe(200);
- expect(fetch).toHaveBeenCalledTimes(3);expect(budget).toHaveBeenCalledTimes(3);expect(fetch.mock.calls[2][0]).toContain("/gemini-2.5-flash-lite:");
+ expect(fetch).toHaveBeenCalledTimes(3);expect(budget).toHaveBeenCalledTimes(3);expect(fetch.mock.calls[2][0]).toContain("/gemini-3.1-flash-lite:");
 });
 it.each([["0","GenerateRequestsPerDayPerProjectPerModel-FreeTier"],["20","GenerateRequestsPerDayPerProject"],["20","GenerateRequestsPerMinutePerProjectPerModel-FreeTier"]])("does not route around zero, account-wide or minute quota (%s %s)",async(value,limit)=>{
  const fetch=vi.fn().mockResolvedValue(dailyQuota(value,limit));vi.stubGlobal("fetch",fetch);expect((await POST(request())).status).toBe(429);expect(fetch).toHaveBeenCalledTimes(1);
@@ -103,5 +103,5 @@ it("returns to the primary model after Google's Pacific daily reset",async()=>{
 it("keeps the bounded transient retry when starting on a cached Gemini fallback",async()=>{
  const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);await POST(request());
  fetch.mockResolvedValueOnce(Response.json({error:{status:"UNAVAILABLE"}},{status:503}));const pending=POST(request());await vi.runAllTimersAsync();expect((await pending).status).toBe(200);
- expect(fetch).toHaveBeenCalledTimes(4);expect(budget).toHaveBeenCalledTimes(4);expect(fetch.mock.calls[2][0]).toContain("/gemini-2.5-flash-lite:");expect(fetch.mock.calls[3][0]).toContain("/gemini-2.5-flash-lite:");
+ expect(fetch).toHaveBeenCalledTimes(4);expect(budget).toHaveBeenCalledTimes(4);expect(fetch.mock.calls[2][0]).toContain("/gemini-3.1-flash-lite:");expect(fetch.mock.calls[3][0]).toContain("/gemini-3.1-flash-lite:");
 });

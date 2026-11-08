@@ -84,7 +84,7 @@ async function extract(request: Request, requestId: string) {
       file: receiptFile,
       apiKey,
       model,
-      fallbackModel: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash-lite",
+      fallbackModel: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.1-flash-lite",
       beforeRetry: async () => {
         const limit = await reserveProviderCall(request);
         if (limit) {

@@ -1,5 +1,5 @@
 import {chooseExport} from './support/actions';
-import {test,expect} from '@playwright/test';
+import {test,expect} from './support/test';
 import {gotoHome,uploadReceipt,mockExtractionResponse,highConfidenceExtraction} from './support/receipt';
 import {readFile} from 'node:fs/promises';
 test('samples and uploads use one direct-export queue and one export toolbar',async({page})=>{

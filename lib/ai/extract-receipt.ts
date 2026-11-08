@@ -194,6 +194,7 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
   const timeout = setTimeout(() => controller.abort(), timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS);
 
   let geminiResponse: Response;
+  let geminiJson: GeminiResponse;
 
   try {
     geminiResponse = await fetch(endpoint, {
@@ -220,11 +221,14 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
         ],
         generationConfig: {
           temperature: 0.1,
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          maxOutputTokens: 4096
         }
       })
     });
+    geminiJson = await readProviderResponse(geminiResponse);
   } catch (error) {
+    if (error instanceof ReceiptExtractionError) throw error;
     if (error instanceof Error && error.name === "AbortError") {
       throw new ReceiptExtractionError("AI_PROVIDER_ERROR", "Extraction timed out. Please try again.", 504);
     }
@@ -234,7 +238,6 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
     clearTimeout(timeout);
   }
 
-  const geminiJson = (await geminiResponse.json()) as GeminiResponse;
 
   if (!geminiResponse.ok) {
     const error = new ReceiptExtractionError(
@@ -283,8 +286,22 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
 
     throw new ReceiptExtractionError(
       "INVALID_AI_RESPONSE",
-      error instanceof Error ? error.message : "The extraction service returned an invalid response.",
+      "The extraction service returned an invalid response.",
       502
     );
   }
+}
+
+/** Bound even malformed upstream output; the fetch abort timer remains active during body reads. */
+async function readProviderResponse(response: Response): Promise<GeminiResponse> {
+  const limit=128*1024;
+  const invalid=()=>new ReceiptExtractionError("INVALID_AI_RESPONSE","The extraction service returned an invalid response.",502);
+  if(Number(response.headers?.get("content-length"))>limit)throw invalid();
+  if(!response.body)return await response.json() as GeminiResponse;
+  const reader=response.body.getReader();const chunks:Uint8Array[]=[];let size=0;
+  try {
+    while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit){void reader.cancel().catch(()=>{});throw invalid();}chunks.push(value);}
+    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+    try{return JSON.parse(new TextDecoder().decode(bytes)) as GeminiResponse;}catch{throw invalid();}
+  } finally {reader.releaseLock();}
 }

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/test';
 import { highConfidenceExtraction, createGeneratedReceiptPng } from './support/receipt';
 import { extractionToFormValues } from '../../lib/receipt';
 const branded='https://receipt-to-form-syahmiharith.vercel.app';

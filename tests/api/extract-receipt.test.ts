@@ -2,17 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/extract-receipt/route";
 import { resetReceiptExtractionRateLimitForTests } from "@/lib/rate-limit";
 
+import { configurePilotAccess, testPilotCookie } from "./support/pilot";
+
 const originalEnv = process.env;
 
 function createRequest(file?: File, headers?: Record<string, string>) {
   if (file && typeof file.arrayBuffer !== "function") {
     Object.defineProperty(file, "arrayBuffer", {
-      value: async () => new ArrayBuffer(file.size)
+      value: async () => new Uint8Array(file.type==="image/jpeg"?[255,216,255]:file.type==="image/webp"?[82,73,70,70,0,0,0,0,87,69,66,80]:[137,80,78,71,13,10,26,10]).buffer
     });
   }
 
   return {
-    headers: new Headers(headers),
+    headers: new Headers({cookie:testPilotCookie(),"content-type":"multipart/form-data; boundary=test",...headers}),
     formData: async () =>
       ({
         get: (name: string) => (name === "receipt" ? file ?? null : null)
@@ -22,20 +24,20 @@ function createRequest(file?: File, headers?: Record<string, string>) {
 
 function createBrokenRequest() {
   return {
-    headers: new Headers(),
+    headers: new Headers({cookie:testPilotCookie(),"content-type":"multipart/form-data; boundary=test"}),
     formData: async () => {
       throw new Error("internal parser detail");
     }
   } as unknown as Request;
 }
 
-function createImageFile(name = "receipt.png", content = "fake image content") {
+function createImageFile(name = "receipt.png", content: string | Uint8Array<ArrayBuffer> = new Uint8Array([137,80,78,71,13,10,26,10])) {
   return new File([content], name, { type: "image/png" });
 }
 
 function createReceiptFile(type: string, name = "receipt") {
   const extension = type.split("/")[1]?.replace("jpeg", "jpg") || "bin";
-  return new File(["fake image content"], `${name}.${extension}`, { type });
+  return new File([type==="image/jpeg"?new Uint8Array([255,216,255]):type==="image/webp"?new Uint8Array([82,73,70,70,0,0,0,0,87,69,66,80]):new Uint8Array([137,80,78,71,13,10,26,10])], `${name}.${extension}`, { type });
 }
 
 function mockGeminiResponse(text: string) {
@@ -66,11 +68,13 @@ describe("POST /api/extract-receipt", () => {
     vi.resetModules();
     resetReceiptExtractionRateLimitForTests();
     process.env = { ...originalEnv };
+    configurePilotAccess();
   });
 
   afterEach(() => {
     process.env = originalEnv;
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -358,9 +362,9 @@ describe("POST /api/extract-receipt", () => {
     const response = await POST(createBrokenRequest());
     const body = await readJson(response);
 
-    expect(response.status).toBe(500);
-    expect(body.code).toBe("UNKNOWN_ERROR");
-    expect(body.error).toBe("Receipt extraction failed. Please try again with a clearer image.");
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("INVALID_REQUEST");
+    expect(body.error).toBe("Could not read this receipt upload.");
     expect(body.error).not.toContain("internal parser detail");
   });
 

@@ -1,5 +1,5 @@
 import {chooseExport} from './support/actions';
-import {test,expect,type Page,type Route} from '@playwright/test';
+import {test,expect,type Page,type Route} from './support/test';
 import {readFile} from 'node:fs/promises';
 import {gotoHome,uploadReceipts,highConfidenceExtraction} from './support/receipt';
 

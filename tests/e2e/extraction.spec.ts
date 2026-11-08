@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 import {
   defaultReceiptFile,
   expandCurrentReceipt,
@@ -103,6 +103,6 @@ test.describe("receipt extraction queue behavior", () => {
     await page.getByRole("button", { name: /Select second-receipt.png/i }).click();
     await extractButton(page, /^Extract$/i).click();
 
-    expect(calls).toHaveLength(2);
+    await expect.poll(()=>calls.length).toBe(2);
   });
 });

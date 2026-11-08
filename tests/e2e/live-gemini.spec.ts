@@ -1,13 +1,15 @@
 import {chooseExport} from './support/actions';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { createGeneratedReceiptPng, gotoHome, uploadReceipt, extractButton, expandCurrentReceipt } from './support/receipt';
+import { authorizeLivePilot, createGeneratedReceiptPng, gotoHome, uploadReceipt, extractButton, expandCurrentReceipt } from './support/receipt';
+test.use({trace:'off',video:'off',screenshot:'off'});
 test('deployed real-provider extraction through reviewed CSV', async ({ page, baseURL }, info) => {
   test.skip(process.env.RUN_LIVE_GEMINI_E2E !== '1', 'Enable RUN_LIVE_GEMINI_E2E for live provider verification.');
   const localServer = !baseURL || ['localhost', '127.0.0.1', '[::1]'].includes(new URL(baseURL).hostname);
   test.skip(localServer && !process.env.GEMINI_API_KEY, 'Local live verification requires GEMINI_API_KEY.');
   test.setTimeout(120000);
   await gotoHome(page);
+  await authorizeLivePilot(page);
   await uploadReceipt(page, await createGeneratedReceiptPng(page));
   let responsePromise = page.waitForResponse(r => r.url().includes('/api/extract-receipt'));
   await extractButton(page, /^Extract$/i).click();

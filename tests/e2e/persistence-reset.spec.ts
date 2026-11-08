@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 import { gotoHome, uploadReceipts } from "./support/receipt";
 
 test.describe("receipt queue item controls", () => {

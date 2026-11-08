@@ -1,4 +1,5 @@
 "use client";
+import { PilotAccessDialog } from "./components/pilot-access-dialog";
 import { ExportMenu } from "./components/export-menu";
 import { ArchivePicker } from "./components/archive-picker";
 import { isZip, maxArchiveBytes, type ArchiveSource } from "@/lib/receipt-archive";
@@ -22,6 +23,7 @@ import {
   Loader2,
   RotateCcw,
   RotateCw,
+  LogOut,
   ZoomIn,
   ZoomOut,
   Square,
@@ -330,7 +332,7 @@ function ReceiptPreviewModal({ item, onClose }: { item: ReceiptQueueItem; onClos
               <dd className="mt-1 text-slate-950">{item.file.type || "Image"}</dd>
             </div>
           </dl>
-          </details>
+        </details>
         </div>
       </div>
     </div>
@@ -455,7 +457,7 @@ function ReceiptQueueItemRow({item,onToggleSelected,onToggleExpanded,onPreview,o
   item:ReceiptQueueItem; onToggleSelected:(id:string)=>void; onToggleExpanded:(id:string)=>void; onPreview:(id:string)=>void; onDelete:(id:string)=>void;
   onFieldChange:(id:string,field:keyof ReceiptFormValues,value:string)=>void;
   onLineChange:(id:string,index:number,field:keyof EditableLineItem,value:string)=>void;
-  onAddLine:(id:string)=>void; onRemoveLine:(id:string,index:number)=>void; onRetry:(id:string)=>void; busy:boolean;
+  onAddLine:(id:string)=>void; onRemoveLine:(id:string,index:number)=>void; onRetry:(id:string,target:HTMLButtonElement)=>void; busy:boolean;
 }) {
   const ready=isExportable(item);
   const failed=item.status==="failed";
@@ -480,7 +482,7 @@ function ReceiptQueueItemRow({item,onToggleSelected,onToggleExpanded,onPreview,o
     </div>
     {item.expanded&&<>
       <ExpandedReceiptDetails item={item} onFieldChange={onFieldChange} onLineChange={onLineChange} onAddLine={onAddLine} onRemoveLine={onRemoveLine}/>
-      {failed&&<div className="border-t border-slate-100 px-4 py-2"><button disabled={busy} onClick={()=>onRetry(item.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40"><RotateCcw className="h-4 w-4" aria-hidden="true"/>Retry</button></div>}
+      {failed&&<div className="border-t border-slate-100 px-4 py-2"><button disabled={busy} onClick={event=>onRetry(item.id,event.currentTarget)} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40"><RotateCcw className="h-4 w-4" aria-hidden="true"/>Retry</button></div>}
     </>}
     {item.status==="extracting"&&<div role="progressbar" aria-label={`Extracting ${item.file.name}`} aria-valuetext="Waiting for extraction result" className="extraction-progress absolute inset-x-0 bottom-0 h-[3px] overflow-hidden rounded-b-2xl bg-blue-100"><span aria-hidden="true" className="extraction-progress-segment absolute inset-y-0 left-0 w-1/3 rounded-full bg-blue-600"/></div>}
   </article>;
@@ -509,7 +511,7 @@ function FloatingBatchFooter({
   canDownloadSelected: boolean;
   onSelectToggle: () => void;
   onFiles: (files: FileList | null) => void;
-  onExtract: () => void;
+  onExtract: (target:HTMLButtonElement) => void;
   onDownload: () => void;
   eligibleCount: number;
   onJson: () => void;
@@ -539,7 +541,7 @@ function FloatingBatchFooter({
           {(hasExtractable || hasInvalidExtraction || busy) && <button
             type="button"
             disabled={!canExtractSelected}
-            onClick={onExtract}
+            onClick={event=>onExtract(event.currentTarget)}
             aria-busy={busy}
             title={busy ? "Extracting selected receipts" : canExtractSelected ? "Extract selected receipts" : hasExtractable ? "Select queued or failed receipts to extract" : "Correct receipt fields to continue"}
             className={clsx("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed", busy ? "bg-blue-50 text-blue-700" : "bg-blue-600 text-white enabled:hover:bg-blue-700 disabled:bg-slate-300 disabled:opacity-40")}
@@ -560,6 +562,9 @@ const feedbackUrl = "https://github.com/syahmiharith/receipt-to-form/issues/new?
 }).toString();
 
 function ProductFooter() {
+  const [ending,setEnding]=useState(false);
+  const [sessionMessage,setSessionMessage]=useState("");
+  async function endSession(){setEnding(true);try{const response=await fetch("/api/pilot-access",{method:"DELETE",credentials:"same-origin",signal:AbortSignal.timeout(5000)});setSessionMessage(response.ok?"Pilot session ended.":"Could not end your session. Try again.");}catch{setSessionMessage("Could not end your session. Try again.");}finally{setEnding(false);}}
   const linkStyle = "inline-flex min-h-11 items-center gap-2 rounded text-sm text-slate-600 transition hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500";
   return (
     <footer className="border-t border-slate-200 bg-white/60 px-4 py-8 sm:px-6 lg:px-8">
@@ -574,7 +579,10 @@ function ProductFooter() {
         </div>
         <details className="max-w-2xl text-xs text-slate-600">
           <summary className="min-h-11 w-fit cursor-pointer rounded py-3 underline-offset-4 hover:text-slate-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">Privacy &amp; storage</summary>
+          <p className="pt-2 leading-relaxed">Live extraction requires a pilot invite code. Access uses a secure session cookie for up to 24 hours; codes expire and have limited extraction allowances.</p>
           <p className="pt-2 leading-relaxed">Live extraction uses Google Gemini. Samples stay in your browser without a provider request. Receipts and edits are saved in this browser for seven days after your last edit. Browser storage may be cleared; export anything you need to keep.</p>
+            <button type="button" onClick={()=>void endSession()} disabled={ending} aria-busy={ending} className="mt-2 inline-flex min-h-11 items-center gap-2 rounded px-1 font-medium hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40">{ending?<Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/>:<LogOut className="h-4 w-4" aria-hidden="true"/>}End pilot session</button>
+          <p role="status" aria-live="polite">{sessionMessage}</p>
         </details>
       </div>
     </footer>
@@ -582,6 +590,10 @@ function ProductFooter() {
 }
 
 export default function Home() {
+  const [pilotAccessOpen,setPilotAccessOpen]=useState(false);
+  const pilotReturnFocus=useRef<HTMLElement|null>(null);
+  const pilotResume=useRef(false);
+  const pendingExtractionIds=useRef<string[]|undefined>(undefined);
   const [items, setItems] = useState<ReceiptQueueItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [previewItemId, setPreviewItemId] = useState<string | null>(null);
@@ -797,6 +809,7 @@ export default function Home() {
       const payload = (await response.json()) as ExtractApiResponse;
 
       if (!response.ok || !payload.data) {
+        if(payload.code==="PILOT_ACCESS_REQUIRED"){stopRequested.current=true;pendingExtractionIds.current=undefined;setPilotAccessOpen(true);setQueueRun(run=>run&&({...run,stopping:true,pauseReason:"Enter your pilot code to continue."}));}
         if(response.status===429||payload.code==="RATE_LIMITED"){
           stopRequested.current=true;
           setQueueRun(run=>run&&({...run,stopping:true,pauseReason:payload.error||"Extraction limit reached. Retry later or use samples."}));
@@ -840,9 +853,18 @@ export default function Home() {
     }
   }
 
-  async function extractSelected(ids?: string[]) {
+  async function extractSelected(ids?: string[], authorized=false) {
     // The ref guards repeated clicks before React has committed the busy state.
     if (queueRunning.current || uploadInProgress.current || archives) return;
+    if(!authorized){
+      queueRunning.current=true;setBusy(true);
+      try{
+        const response=await fetch("/api/pilot-access",{credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(5000)});
+        if(!response.ok)throw new Error("Access check unavailable");
+        if((await response.json()).authorized!==true){pendingExtractionIds.current=ids;setPilotAccessOpen(true);return;}
+      }catch{setRemovedToast("Could not check pilot access. Try again.");return;}
+      finally{queueRunning.current=false;setBusy(false);}
+    }
     queueRunning.current = true;
     setBusy(true);
     stopRequested.current = false;
@@ -865,6 +887,7 @@ export default function Home() {
       setQueueRun(run=>run&&({...run,stopped:completed<targets.length,stopping:false}));
       queueRunning.current = false;
       setBusy(false);
+      if(pilotResume.current){pilotResume.current=false;void extractSelected(pendingExtractionIds.current,true);}
     }
   }
 
@@ -936,6 +959,7 @@ export default function Home() {
         {removedToast && <p role="status" className="text-slate-600">{removedToast}</p>}
         {legacy && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3">You are recovering receipts saved at the old address. Finish reviewing and export them here. Saved work stays here until cleared or expired. <a className="underline font-semibold" href="https://receipt-to-form-syahmiharith.vercel.app/">Open the main app</a></div>}
       </section>
+      {pilotAccessOpen&&<PilotAccessDialog onClose={()=>{setPilotAccessOpen(false);requestAnimationFrame(()=>pilotReturnFocus.current?.focus());}} onAuthorized={()=>{setPilotAccessOpen(false);if(queueRunning.current)pilotResume.current=true;else void extractSelected(pendingExtractionIds.current,true);}}/>}
       <main className="flex flex-1 flex-col px-4 pb-4 pt-5 sm:px-6 lg:px-8">
         {archives&&<ArchivePicker sources={archives} slots={Math.max(0,maxFiles-items.length)} onCancel={closeArchives} onAdd={async selection=>{
           const {extractArchive}=await import("@/lib/receipt-archive");const files:File[]=[];
@@ -975,7 +999,7 @@ export default function Home() {
                   onLineChange={updateLine}
                   onAddLine={addLine}
                   onRemoveLine={removeLine}
-                  onRetry={(id) => { void extractSelected([id]); }}
+                  onRetry={(id,target) => { pilotReturnFocus.current=target;void extractSelected([id]); }}
                   busy={busy||addingFiles||Boolean(archives)}
                 />
               ))}
@@ -996,7 +1020,7 @@ export default function Home() {
               setItems((current) => current.map((item) => ({ ...item, selected: shouldSelect, resultSeen: true })));
             }}
             onFiles={prepareFiles}
-            onExtract={() => { void extractSelected(); }}
+            onExtract={target => { pilotReturnFocus.current=target;void extractSelected(); }}
             hasExtractable={items.some((item) => extractableStatuses.includes(item.status))}
             hasInvalidExtraction={items.some((item) => Boolean(item.extraction) && !isExportable(item))}
             eligibleCount={completeSelectedItems.length}

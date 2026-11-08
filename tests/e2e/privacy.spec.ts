@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './support/test';
 import {gotoHome} from './support/receipt';
 test('provider name is only disclosed in opt-in privacy details',async({page})=>{
  await gotoHome(page);

@@ -1,5 +1,5 @@
 import {chooseExport} from './support/actions';
-import {expect,test,type Route} from '@playwright/test';
+import {expect,test,type Route} from './support/test';
 import {readFile} from 'node:fs/promises';
 import {currentCurrencies} from '../../lib/currencies';
 import {gotoHome,highConfidenceExtraction,uploadReceipts,mockExtractionResponse,createGeneratedReceiptPng} from './support/receipt';

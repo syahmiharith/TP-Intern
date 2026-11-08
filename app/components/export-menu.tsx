@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Braces, Download, FileSpreadsheet } from "lucide-react";
 
 export function ExportMenu({disabled,onCsv,onJson}:{disabled:boolean;onCsv:()=>void;onJson:()=>void}) {
   const [open,setOpen]=useState(false);
   const [below,setBelow]=useState(false);
+  const [alignLeft,setAlignLeft]=useState(false);
   const root=useRef<HTMLDivElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   const menu=useRef<HTMLDivElement>(null);
@@ -17,6 +18,17 @@ export function ExportMenu({disabled,onCsv,onJson}:{disabled:boolean;onCsv:()=>v
     return()=>document.removeEventListener("pointerdown",outside);
   },[visible]);
   useEffect(()=>{if(disabled)setOpen(false);},[disabled]);
+  useLayoutEffect(()=>{
+    if(!visible)return;
+    function position(){
+      const button=trigger.current?.getBoundingClientRect();
+      if(!button)return;
+      setAlignLeft(button.right-(menu.current?.offsetWidth??176)<8);
+      setBelow(button.top<120);
+    }
+    position();window.addEventListener("resize",position);
+    return()=>window.removeEventListener("resize",position);
+  },[visible]);
   function focusItem(index:number){menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[index]?.focus();}
   function show(index=0){
     setBelow((trigger.current?.getBoundingClientRect().top??0)<120);
@@ -46,7 +58,7 @@ export function ExportMenu({disabled,onCsv,onJson}:{disabled:boolean;onCsv:()=>v
       <Download className="h-4 w-4" aria-hidden="true"/>Export
     </button>
     {visible&&<div ref={menu} id={id} role="menu" aria-label="Export format" onKeyDown={navigate}
-      className={`absolute right-0 z-50 w-44 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-1 shadow-lg ${below?"top-full mt-2":"bottom-full mb-2"}`}>
+      className={`absolute z-50 w-44 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-1 shadow-lg ${alignLeft?"left-0":"right-0"} ${below?"top-full mt-2":"bottom-full mb-2"}`}>
       <button type="button" role="menuitem" tabIndex={-1} onClick={()=>choose(onCsv)} className={option}><FileSpreadsheet className="h-4 w-4" aria-hidden="true"/>CSV</button>
       <button type="button" role="menuitem" tabIndex={-1} onClick={()=>choose(onJson)} className={option}><Braces className="h-4 w-4" aria-hidden="true"/>JSON</button>
     </div>}

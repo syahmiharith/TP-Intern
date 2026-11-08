@@ -7,7 +7,7 @@ Receipt-to-Form turns receipt images into editable expenses and line items. Corr
 
 **Run the app:** follow [Getting Started](#getting-started).
 
-**Live demo:** <https://receipt-to-form-syahmiharith.vercel.app/>
+**Public samples · private pilot extraction:** <https://receipt-to-form-syahmiharith.vercel.app/>
 
 **Walkthrough:** [Demo Script](./docs/DEMO_SCRIPT.md). The earlier recording is retained in Git history, not presented as a current UI demonstration.
 
@@ -18,12 +18,14 @@ Receipt-to-Form turns receipt images into editable expenses and line items. Corr
 ## Quick Path
 
 1. Upload one to five JPG, PNG or WebP receipts, select images from a ZIP, or choose the optional samples.
-2. Extract uploaded receipts and compare each result with its image. If a request fails, **Extract** retries selected failed receipts without re-extracting successful results or replacing their corrections.
+2. Enter your private pilot code to extract uploaded receipts, then compare each result with its image. Public samples need no code. If a request fails, **Extract** retries selected failed receipts without re-extracting successful results or replacing their corrections.
 3. Expand a row to correct fields and edit item names, quantities and prices. Changes save automatically; no approval or manual Save action is required.
 4. Use **Export → CSV** in the batch toolbar for valid selected receipts and current line items. **Export → JSON** retains original provenance.
 5. Invalid fields exclude a receipt until corrected. Refresh restores current corrections and line items. Model confidence remains unchanged and never gates export.
 
 The branded address above is the main entry. The older tp-intern-malaysia address keeps a recovery workflow for existing saved receipts; finish and export there before clearing them and continuing to the main app.
+
+Live extraction is invite-only during the pilot. Codes expire and have a server-enforced allowance. See [Pilot security controls](docs/SECURITY.md) for issuance, revocation, limits and verification.
 
 ## Product decisions
 

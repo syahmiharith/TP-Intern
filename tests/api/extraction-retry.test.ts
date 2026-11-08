@@ -1,3 +1,4 @@
+import { configurePilotAccess, testPilotCookie } from "./support/pilot";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resetGeminiQuotaCacheForTests } from "@/lib/ai/extract-receipt";
 import { POST } from "@/app/api/extract-receipt/route";
@@ -9,14 +10,15 @@ const budget = vi.mocked(reserveProviderCall);
 const extraction = { merchantName: "Cafe", receiptType: "Other", date: "2026-11-06", totalAmount: 12, currency: "USD", confidence: "high", notes: [], items: [] };
 function request() {
   const file = new File(["synthetic"], "sample.png", { type: "image/png" });
-  Object.defineProperty(file, "arrayBuffer", { value: async () => new ArrayBuffer(9) });
-  return { headers: new Headers(), formData: async () => ({ get: () => file }) } as unknown as Request;
+  Object.defineProperty(file, "arrayBuffer", { value: async () => new Uint8Array([137,80,78,71,13,10,26,10]).buffer });
+  return { headers: new Headers({cookie:testPilotCookie(),"content-type":"multipart/form-data; boundary=test"}), formData: async () => ({ get: () => file }) } as unknown as Request;
 }
 function success() {
   return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(extraction) }] } }] });
 }
 beforeEach(() => {
   vi.useFakeTimers();
+  configurePilotAccess();
   resetGeminiQuotaCacheForTests();
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   // Explicitly exercise compatibility with legacy model configurations.

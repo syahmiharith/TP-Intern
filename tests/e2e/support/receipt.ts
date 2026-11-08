@@ -262,3 +262,11 @@ export async function storedImageCount(page: Page) {
     open.onerror = () => reject(open.error);
   }));
 }
+
+/** Live runs use real private access; never include codes in traces or public artifacts. */
+export async function authorizeLivePilot(page:Page){
+  const code=process.env.PILOT_CODE;
+  if(!code)throw new Error("Live verification requires PILOT_CODE from a private invite.");
+  const response=await page.request.post("/api/pilot-access",{data:{code}});
+  expect(response.status(),"Private pilot access failed").toBe(200);
+}

@@ -33,7 +33,7 @@ Run the real Gemini smoke test once before demo recording:
 npm run test:e2e:live
 ```
 
-`npm run test:e2e:live` requires `GEMINI_API_KEY` in a local env file. `GEMINI_MODEL` is optional.
+`npm run test:e2e:live` requires `PILOT_CODE` from a private invite. Local live runs also need generated pilot configuration, shared-budget credentials and `GEMINI_API_KEY` in a private env file. `GEMINI_MODEL` is optional. Deployed runs use the server credentials and never pull production secrets. Live scenarios disable traces, video and screenshots to avoid recording private codes. See [Pilot security](docs/SECURITY.md).
 
 ## First-Time Playwright Setup
 

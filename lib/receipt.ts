@@ -6,6 +6,8 @@ export const allowedReceiptImageTypes = ["image/jpeg", "image/png", "image/webp"
 export const maxReceiptImageSizeBytes = 5 * 1024 * 1024;
 
 export type ExtractionErrorCode =
+  | "INVALID_REQUEST"
+  | "PILOT_ACCESS_REQUIRED"
   | "NO_RECEIPT_UPLOADED"
   | "INVALID_FILE_TYPE"
   | "FILE_TOO_LARGE"

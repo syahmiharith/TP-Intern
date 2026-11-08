@@ -1,5 +1,5 @@
 import {chooseExport} from './support/actions';
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route } from "./support/test";
 import { readFile } from "node:fs/promises";
 import { expandCurrentReceipt, gotoHome, highConfidenceExtraction, mockExtractionResponse, storedImageCount, uploadReceipts } from "./support/receipt";
 

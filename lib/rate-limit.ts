@@ -1,19 +1,21 @@
+import { receiptClientIp } from "./client-ip";
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 15;
+const MAX_BUCKETS = 4096;
 
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
-function getClientIp(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwardedFor || request.headers.get("x-real-ip") || "unknown";
-}
-
 export function checkReceiptExtractionRateLimit(request: Request) {
   const now = Date.now();
-  const clientIp = getClientIp(request);
+  const clientIp = receiptClientIp(request);
   const current = rateLimitBuckets.get(clientIp);
 
   if (!current || current.resetAt <= now) {
+    if(rateLimitBuckets.size>=MAX_BUCKETS){
+      for(const [key,bucket] of rateLimitBuckets)if(bucket.resetAt<=now)rateLimitBuckets.delete(key);
+      if(!current && rateLimitBuckets.size>=MAX_BUCKETS)return Response.json({code:"RATE_LIMITED",error:"Extraction is busy. Retry shortly."},{status:429,headers:{"Retry-After":"60"}});
+    }
     rateLimitBuckets.set(clientIp, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return null;
   }
@@ -24,7 +26,7 @@ export function checkReceiptExtractionRateLimit(request: Request) {
         code: "RATE_LIMITED",
         error: "Rate limit exceeded. You can extract up to 15 receipts per minute. Please wait before trying again."
       },
-      { status: 429 }
+      { status: 429, headers: { "Retry-After": String(Math.max(1,Math.ceil((current.resetAt-now)/1000))) } }
     );
   }
 

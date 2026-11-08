@@ -1,13 +1,15 @@
 import {chooseExport} from './support/actions';
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { createGeneratedReceiptPng, gotoHome } from "./support/receipt";
+import { authorizeLivePilot, createGeneratedReceiptPng, gotoHome } from "./support/receipt";
 
+test.use({trace:'off',video:'off',screenshot:'off'});
 test("real PNG JPEG and WebP receipts complete one reviewed expense batch", async ({ page, browserName }, info) => {
   test.skip(process.env.RUN_LIVE_GEMINI_E2E !== "1", "Enable live-provider verification explicitly.");
   test.skip(browserName !== "chromium", "The real format matrix runs once to conserve provider quota.");
   test.setTimeout(180000);
   await gotoHome(page);
+  await authorizeLivePilot(page);
   const png = await createGeneratedReceiptPng(page);
   const encoded = await page.evaluate(async (base64) => {
     const image = new Image();

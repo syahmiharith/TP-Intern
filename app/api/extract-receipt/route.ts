@@ -1,4 +1,7 @@
+import { readPilotSession, pilotAccessRequired } from "@/lib/pilot-access";
 import { reserveProviderCall } from "@/lib/shared-budget";
+import { receiptImageType } from "@/lib/receipt-image";
+import { ExtractionRequestError, readExtractionForm, validateExtractionRequest } from "@/lib/extraction-request";
 import { validateReceiptForm, extractionToFormValues } from "@/lib/receipt";
 import { extractReceiptFromImage, ReceiptExtractionError } from "@/lib/ai/extract-receipt";
 import {
@@ -9,6 +12,7 @@ import {
 import { checkReceiptExtractionRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+export const maxDuration = 90;
 
 type ErrorBody = {
   code: ExtractionErrorCode;
@@ -16,7 +20,7 @@ type ErrorBody = {
 };
 
 function jsonResponse(body: unknown, status = 200) {
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 function errorResponse(code: ExtractionErrorCode, error: string, status: number) {
@@ -43,6 +47,9 @@ async function extract(request: Request, requestId: string) {
   console.info("[receipt-extraction] request received");
 
   try {
+    if(!readPilotSession(request))return pilotAccessRequired();
+    validateExtractionRequest(request);
+    if(process.env.LIVE_EXTRACTION_ENABLED==="false")return errorResponse("RATE_LIMITED","Live extraction is temporarily unavailable. Try sample receipts.",503);
     const apiKey = process.env.GEMINI_API_KEY;
     const model = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
@@ -61,7 +68,7 @@ async function extract(request: Request, requestId: string) {
       return rateLimitResponse;
     }
 
-    const formData = await request.formData();
+    const formData = await readExtractionForm(request);
     const receipt = formData.get("receipt");
     const validationError = validateReceiptFile(receipt);
 
@@ -70,9 +77,11 @@ async function extract(request: Request, requestId: string) {
       return validationError;
     }
 
+    const receiptFile = receipt as File;
+    if(!receiptFile.size || receiptImageType(new Uint8Array(await receiptFile.arrayBuffer()))!==receiptFile.type) return errorResponse("INVALID_FILE_TYPE","This file does not match a supported receipt image.",400);
+
     const sharedLimit = await reserveProviderCall(request);
     if (sharedLimit) return sharedLimit;
-    const receiptFile = receipt as File;
 
     console.info("[receipt-extraction] file validation passed");
     console.info("[receipt-extraction] ai call started", {
@@ -89,7 +98,7 @@ async function extract(request: Request, requestId: string) {
         const limit = await reserveProviderCall(request);
         if (limit) {
           const body = await limit.json() as { error: string };
-          throw new ReceiptExtractionError("RATE_LIMITED", body.error, limit.status);
+          throw new ReceiptExtractionError(limit.status===401?"PILOT_ACCESS_REQUIRED":"RATE_LIMITED", body.error, limit.status);
         }
       }
     });
@@ -99,6 +108,7 @@ async function extract(request: Request, requestId: string) {
 
     return jsonResponse({ data: extraction, requestId, extractedAt: new Date().toISOString(), warnings: Object.entries(validateReceiptForm(extractionToFormValues(extraction))).map(([field, message]) => ({ field, message })) });
   } catch (error) {
+    if(error instanceof ExtractionRequestError)return errorResponse(error.code,error.message,error.status);
     if (error instanceof ReceiptExtractionError) {
       console.warn("[receipt-extraction] extraction failed", {
         requestId, code: error.code, status: error.status, providerStatus: error.providerStatus,
@@ -122,6 +132,7 @@ export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
   const response = await extract(request, requestId);
+  response.headers.set("Cache-Control", "no-store");
   response.headers.set("X-Request-ID", requestId);
   console.info("[receipt-extraction] completed", { requestId, durationMs: Date.now() - startedAt, status: response.status });
   return response;

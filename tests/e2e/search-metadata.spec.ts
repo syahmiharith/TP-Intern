@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/test';
 
 test('search and sharing metadata identify the product, its author and canonical entry', async ({ page, request }) => {
   await page.goto('/');

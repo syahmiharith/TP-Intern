@@ -1,4 +1,4 @@
-import {expect,test} from "@playwright/test";
+import {expect,test} from "./support/test";
 import {gotoHome,uploadReceipt,mockExtractionResponse,lowConfidenceExtraction,expandCurrentReceipt,fillReviewFields} from "./support/receipt";
 test("invalid required data blocks export and corrected data is immediately eligible",async({page})=>{
  await mockExtractionResponse(page,lowConfidenceExtraction);await gotoHome(page);await uploadReceipt(page);await page.getByRole("button",{name:"Extract",exact:true}).click();

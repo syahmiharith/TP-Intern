@@ -1,5 +1,5 @@
 import {chooseExport} from './support/actions';
-import {test,expect} from '@playwright/test';
+import {test,expect} from './support/test';
 import {zipSync} from 'fflate';
 import {readFile} from 'node:fs/promises';
 import {createGeneratedReceiptPng,gotoHome,highConfidenceExtraction,uploadReceipts} from './support/receipt';

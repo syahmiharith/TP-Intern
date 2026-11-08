@@ -110,7 +110,7 @@ describe("Home page receipt queue", () => {
   });
 
   it("exports a valid extraction directly without a review step", async () => {
-    vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({data:completeExtraction})})));
+    vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({authorized:true,data:completeExtraction})})));
     render(<Home />); await uploadFiles([createImageFile("aeon-receipt.png")]);
     fireEvent.click(screen.getByRole("button",{name:"Extract"}));
     await screen.findByText("Ready");
@@ -123,7 +123,7 @@ describe("Home page receipt queue", () => {
   });
 
   it("preserves three-decimal totals in the live editor", async()=>{
-    vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({data:{...completeExtraction,currency:"KWD",totalAmount:1.234}})})));
+    vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({authorized:true,data:{...completeExtraction,currency:"KWD",totalAmount:1.234}})})));
     render(<Home/>);await uploadFiles([createImageFile("precision.png")]);fireEvent.click(screen.getByRole("button",{name:"Extract"}));
     await screen.findByText("Ready");fireEvent.click(screen.getByRole("button",{name:"Expand precision.png"}));
     expect(screen.getByLabelText("Total Amount")).toHaveValue("1.234");
@@ -131,7 +131,7 @@ describe("Home page receipt queue", () => {
   });
 
   it("updates validation and export eligibility while typing",async()=>{
-    vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({data:partialExtraction})})));
+    vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({authorized:true,data:partialExtraction})})));
     render(<Home/>);await uploadFiles([createImageFile("blurry-receipt.png")]);fireEvent.click(screen.getByRole("button",{name:"Extract"}));
     await screen.findByText("Needs attention");fireEvent.click(screen.getByRole("button",{name:"Expand blurry-receipt.png"}));
     expect(screen.getByText("Merchant name is required.")).toBeInTheDocument();

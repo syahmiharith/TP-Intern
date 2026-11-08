@@ -373,10 +373,10 @@ function ReceiptInsights({item,onLineChange,onAddLine,onRemoveLine}: {
   const lines=itemLines(item);
   return <div className="space-y-4">
     <section aria-label="Receipt notes" className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-xs font-semibold text-slate-700">Notes</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">{(notes.length>0||originalNotes.length>0)&&<h3 className="text-xs font-semibold text-slate-700">Notes</h3>}
         <p className="text-xs text-slate-500" title="Confidence in the original extraction; unchanged by edits.">Extraction confidence <span className="font-semibold capitalize text-slate-700">{item.extraction.confidence}</span></p>
       </div>
-      <ul aria-label="Notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">{(notes.length?notes:["No notes."]).map((note,index)=><li key={index}>{note}</li>)}</ul>
+      {notes.length>0&&<ul aria-label="Notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">{notes.map((note,index)=><li key={index}>{note}</li>)}</ul>}
       {originalNotes.length>0&&<><h3 className="text-xs font-semibold text-slate-700">Extraction notes</h3><ul aria-label="Extraction notes" className="list-disc space-y-1 pl-4 text-sm text-slate-600 [overflow-wrap:anywhere]">{originalNotes.map((note,index)=><li key={index}>{note}</li>)}</ul></>}
     </section>
     <section aria-label="Extracted items" className="space-y-2">
@@ -388,13 +388,19 @@ function ReceiptInsights({item,onLineChange,onAddLine,onRemoveLine}: {
           <span role="columnheader">Name</span><span role="columnheader" className="text-right">Qty</span><span role="columnheader" className="text-right">Price{item.formValues.currency?` (${item.formValues.currency.trim().toUpperCase()})`:""}</span><span role="columnheader" className="sr-only">Actions</span>
         </div>
         {lines.map((line,index)=>{const errors=lineItemErrors(line,item.formValues.currency);return <div role="row" key={index} className="grid min-w-0 grid-cols-[minmax(0,1fr)_3.5rem_5rem_2.5rem] items-start gap-1 border-b border-slate-100 px-2 py-1 last:border-0">
-          {(["name","quantity","price"] as const).map(field=><div role="cell" key={field} className="min-w-0">
-            <input id={`${item.id}-item-${index}-${field}`} aria-label={`Item ${index+1} ${field}`} value={line[field]} type="text" inputMode={field==="name"?"text":"decimal"} autoComplete="off"
-              aria-invalid={Boolean(errors[field])} aria-describedby={errors[field]?`${item.id}-item-${index}-${field}-error`:undefined}
-              onChange={event=>onLineChange(item.id,index,field,event.target.value)}
-              className={clsx("min-h-11 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100",field!=="name"&&"text-right tabular-nums",errors[field]&&"!border-rose-300 bg-rose-50")}/>
-            {errors[field]&&<p id={`${item.id}-item-${index}-${field}-error`} className="px-1 text-xs text-rose-600">{errors[field]}</p>}
-          </div>)}
+          {(["name","quantity","price"] as const).map(field=>{
+            const control={
+              id:`${item.id}-item-${index}-${field}`, "aria-label":`Item ${index+1} ${field}`,
+              value:line[field],autoComplete:"off", "aria-invalid":Boolean(errors[field]),
+              "aria-describedby":errors[field]?`${item.id}-item-${index}-${field}-error`:undefined,
+              className:clsx("min-h-11 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100",field!=="name"&&"text-right tabular-nums",errors[field]&&"!border-rose-300 bg-rose-50")
+            };
+            return <div role="cell" key={field} className="min-w-0">
+              {field==="name"?<AutoGrowTextarea {...control} className={clsx(control.className,"block resize-none overflow-hidden py-2.5 [overflow-wrap:anywhere]")} onChange={event=>onLineChange(item.id,index,field,event.target.value)}/>:
+                <input {...control} type="text" inputMode="decimal" onChange={event=>onLineChange(item.id,index,field,event.target.value)}/>}
+              {errors[field]&&<p id={`${item.id}-item-${index}-${field}-error`} className="px-1 text-xs text-rose-600">{errors[field]}</p>}
+            </div>;
+          })}
           <div role="cell"><IconButton label={`Remove item ${index+1}`} onClick={()=>onRemoveLine(item.id,index)} tone="delete"><Trash2 className="h-3.5 w-3.5" aria-hidden="true"/></IconButton></div>
         </div>;})}
       </div>}
@@ -434,7 +440,7 @@ function EditableField({
     <label className="block min-w-0 space-y-1" htmlFor={control.id}>
       <span className="text-xs font-semibold text-slate-700">{label}</span>
       {field === "merchantName" ? <AutoGrowTextarea {...control}
-        className={clsx(control.className,"block resize-none overflow-hidden [overflow-wrap:anywhere]")}
+        className={clsx(control.className,"block resize-none overflow-hidden py-2.5 [overflow-wrap:anywhere]")}
         onChange={event=>onFieldChange(item.id,field,event.target.value)} /> :
         <input {...control} type={type} inputMode={inputMode} onChange={event=>onFieldChange(item.id,field,event.target.value)} />}
       {error ? <p id={`${item.id}-${field}-error`} className="text-xs font-medium text-rose-600">{error}</p> : null}

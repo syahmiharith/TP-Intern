@@ -107,3 +107,32 @@ test('duplicate note lines appear once without changing saved or original conten
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export JSON',exact:true}).click();
  const [record]=JSON.parse(await readFile((await(await download).path())!,'utf8'));expect(record.originalExtraction.notes).toEqual(notes);expect(record.values.notes).toBe(notes.join('\n'));
 });
+
+for (const width of [375,768,1280]) {
+ test(`item names wrap and shrink while quantities and prices stay compact at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:900});await mockExtractionResponse(page,highConfidenceExtraction);await gotoHome(page);
+  await uploadReceipts(page,[await createGeneratedReceiptPng(page)]);await page.getByRole('button',{name:'Extract 1 file',exact:true}).click();
+  const row=page.locator('article');await expect(row.getByTestId('receipt-status')).toHaveText('Ready');await row.getByRole('button',{name:/^Expand /}).click();
+  const name=row.getByLabel('Item 1 name',{exact:true});const qty=row.getByLabel('Item 1 quantity',{exact:true});const price=row.getByLabel('Item 1 price',{exact:true});
+  const short=(await name.boundingBox())!.height;expect(short).toBeGreaterThanOrEqual(44);expect(short).toBeLessThanOrEqual(46);
+  const long='Specialty coffee and freshly baked sourdough breakfast for the international events team '.repeat(4).trim();
+  await name.fill(long);await expect.poll(async()=>(await name.boundingBox())!.height).toBeGreaterThan(short);
+  expect(await name.evaluate(el=>el.scrollHeight<=el.clientHeight+1&&el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  for(const input of [qty,price]){const box=(await input.boundingBox())!;expect(box.height).toBeLessThanOrEqual(46);expect(box.width).toBeLessThanOrEqual(80);}
+  await name.fill('Coffee');await expect.poll(async()=>(await name.boundingBox())!.height).toBeLessThanOrEqual(short+1);await name.fill(long);
+  await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{const open=indexedDB.open('receipt-expenses');open.onsuccess=()=>{const db=open.result;const tx=db.transaction('batches','readonly');const get=tx.objectStore('batches').get('current');get.onsuccess=()=>resolve(get.result.items[0].lineItems[0].name);tx.oncomplete=()=>db.close();};}))).toBe(long);
+  await page.reload();await expect(name).toHaveValue(long);await expect.poll(async()=>(await name.boundingBox())!.height).toBeGreaterThan(short);
+  if(width===375){const mobile=(await name.boundingBox())!.height;await page.setViewportSize({width:1280,height:900});await expect.poll(async()=>(await name.boundingBox())!.height).toBeLessThan(mobile);}
+  const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export JSON',exact:true}).click();const [record]=JSON.parse(await readFile((await(await download).path())!,'utf8'));expect(record.items[0].name).toBe(long);expect(record.originalExtraction.items[0].name).toBe('Coffee');
+  const csvDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Export expenses CSV (1)',exact:true}).click();expect(await readFile((await(await csvDownload).path())!,'utf8')).toContain(long);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ });
+}
+
+test('non-transaction findings appear once while field validation remains available',async({page})=>{
+ const notes=['Image is a web form, not a traditional receipt.','Currency and total amount are not applicable as no transaction is present.','Date is not visible on the form.','Date could not be confidently extracted. Please enter it manually.','Total amount could not be confidently extracted. Please enter it manually.','Currency could not be confidently extracted. Please enter it manually.'];
+ await mockExtractionResponse(page,{...highConfidenceExtraction,date:null,totalAmount:null,currency:null,notes});await gotoHome(page);await uploadReceipts(page,[await createGeneratedReceiptPng(page)]);await page.getByRole('button',{name:'Extract 1 file',exact:true}).click();
+ const row=page.locator('article');await expect(row.getByTestId('receipt-status')).toHaveText('Needs attention');await row.getByRole('button',{name:/^Expand /}).click();
+ await expect(row.getByRole('list',{name:'Notes',exact:true}).getByRole('listitem')).toHaveText(['No transaction found in this web form.']);await expect(row.getByRole('list',{name:'Extraction notes',exact:true})).toHaveCount(0);
+ await expect(row.getByLabel('Date',{exact:true})).toHaveAttribute('aria-invalid','true');await expect(row.getByLabel('Total Amount',{exact:true})).toHaveAttribute('aria-invalid','true');await expect(page.getByRole('button',{name:'Export expenses CSV (0)',exact:true})).toBeDisabled();
+});

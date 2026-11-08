@@ -69,7 +69,7 @@ describe("Home page receipt queue", () => {
     render(<Home />);
 
     expect(screen.getByText("Upload receipts")).toBeInTheDocument();
-    expect(screen.getByText(/JPG, PNG or WEBP/i)).toBeInTheDocument();
+    expect(screen.getByText(/JPG, PNG, WEBP or ZIP/i)).toBeInTheDocument();
     expect(screen.getByText("Receipt-to-Form")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Receipts in. Expenses ready./i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Extract/i })).not.toBeInTheDocument();

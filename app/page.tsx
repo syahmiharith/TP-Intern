@@ -1,4 +1,6 @@
 "use client";
+import { ArchivePicker } from "./components/archive-picker";
+import { isZip, maxArchiveBytes, type ArchiveSource } from "@/lib/receipt-archive";
 import { AutoGrowTextarea } from "./components/auto-grow-textarea";
 import { receiptDisplayNotes } from "@/lib/receipt-notes";
 import { InlineImage } from "./components/inline-image";
@@ -179,7 +181,7 @@ function UploadDropzone({
         className="peer sr-only"
         type="file"
         multiple
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,.zip,application/zip,application/x-zip-compressed"
         disabled={!canAddMore}
         onChange={(event) => {
           onFiles(event.target.files);
@@ -206,12 +208,12 @@ function UploadDropzone({
         </span>
         {!compact ? (
           <>
-            <span className="mt-3 text-sm text-slate-500">JPG, PNG or WEBP · Up to 5 receipts</span>
-            <span className="mt-1 text-sm text-slate-500">5 MB each</span>
+            <span className="mt-3 text-sm text-slate-500">JPG, PNG, WEBP or ZIP · Up to 5 receipts</span>
+            <span className="mt-1 text-sm text-slate-500">Images: 5 MB each · ZIP: 25 MB</span>
           </>
         ) : null}
       </label>
-      {!compact && <p className="mt-3 text-center text-xs text-slate-500">Uploads are sent to an external AI service.</p>}
+      {!compact && <p className="mt-3 text-center text-xs text-slate-500">Images are sent to an external AI service when you extract.</p>}
     </section>
   );
 }
@@ -599,6 +601,7 @@ export default function Home() {
   const extracting = useRef(false);
   const uploadInProgress = useRef(false);
   const [addingFiles, setAddingFiles] = useState(false);
+  const [archives,setArchives] = useState<ArchiveSource[]|null>(null);
   const [queueRun, setQueueRun] = useState<{ completed: number; total: number; stopping: boolean; stopped: boolean } | null>(null);
   const itemsRef = useRef<ReceiptQueueItem[]>([]);
 
@@ -608,7 +611,7 @@ export default function Home() {
     [selectedItems]
   );
   const completeSelectedItems = useMemo(() => selectedItems.filter(isExportable), [selectedItems]);
-  const canAddMore = !legacy && hydrated && !busy && !addingFiles && items.length < maxFiles;
+  const canAddMore = !legacy && hydrated && !busy && !addingFiles && !archives && items.length < maxFiles;
   const previewItem = items.find((item) => item.id === previewItemId) ?? null;
 
   useEffect(() => {
@@ -647,7 +650,30 @@ export default function Home() {
     updateItem(id, (item) => ({ ...item, resultSeen: true, isNewResult: false }));
   }
 
-  async function handleFiles(files: FileList | null) {
+  async function prepareFiles(files:FileList|null) {
+    if(legacy||!files?.length||uploadInProgress.current||busy||!hydrated||archives)return;
+    const selected=Array.from(files);
+    if(!selected.some(isZip)){await handleFiles(selected);return;}
+    uploadInProgress.current=true;setAddingFiles(true);setErrorMessage(null);
+    try{
+      if(selected.reduce((size,file)=>size+file.size,0)>maxArchiveBytes)throw new Error("Select up to 25 MB at a time.");
+      const {inspectArchive}=await import("@/lib/receipt-archive");const sources:ArchiveSource[]=[];const archiveErrors:string[]=[];const direct=selected.filter(file=>!isZip(file));
+      for(const file of selected.filter(isZip)){
+        try{const bytes=new Uint8Array(await file.arrayBuffer());sources.push({name:file.name,bytes,entries:inspectArchive(bytes)});}
+        catch(error){archiveErrors.push(`${file.name}: ${error instanceof Error?error.message:"Could not open this ZIP. Try an unencrypted ZIP file."}`);}
+      }
+      uploadInProgress.current=false;
+      if(direct.length)await handleFiles(direct);
+      if(sources.reduce((count,source)=>count+source.entries.length,0)>200)throw new Error("Select ZIP files containing no more than 200 entries in total.");
+      if(sources.length)setArchives(sources);
+      if(archiveErrors.length)setErrorMessage(current=>[current,...archiveErrors].filter(Boolean).join(" "));
+    }catch(error){setErrorMessage(error instanceof Error?error.message:"Could not open this ZIP. Try an unencrypted ZIP file.");}
+    finally{uploadInProgress.current=false;setAddingFiles(false);}
+  }
+
+  function closeArchives(){setArchives(null);requestAnimationFrame(()=>document.getElementById(itemsRef.current.length?"receipt-add-upload":"receipt-upload")?.focus());}
+
+  async function handleFiles(files: FileList | File[] | null) {
     if (legacy || !files?.length || uploadInProgress.current || busy || !hydrated) return;
     uploadInProgress.current = true;
     setAddingFiles(true);
@@ -704,7 +730,7 @@ export default function Home() {
   }
 
   function loadSamples() {
-    if (legacy || uploadInProgress.current || busy || itemsRef.current.length > maxFiles - 2) return;
+    if (legacy || archives || uploadInProgress.current || busy || itemsRef.current.length > maxFiles - 2) return;
     setQueueRun(null);
     const samples = [sampleReceipt("Sample cafe", "12.50", "12.50", "Client meeting"), sampleReceipt("Sample stationery", "28.00", "23.00", "Office supplies")];
     setItems((current) => [...current, ...samples]);
@@ -876,8 +902,8 @@ export default function Home() {
         <p className="max-w-2xl text-slate-600">Extract the details, make any corrections, and export to your spreadsheet.</p>
 
         <div className="flex flex-wrap items-center gap-2">
-        {items.length > 0 && <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || items.length > 3} onClick={loadSamples}><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>}
-        {(items.length > 0 || errorMessage) && <button aria-label="Clear all saved receipts" title="Clear all receipts saved in this browser" disabled={!hydrated || busy || addingFiles} onClick={clearSavedData}>Clear all</button>}
+        {items.length > 0 && <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || Boolean(archives) || items.length > 3} onClick={loadSamples}><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>}
+        {(items.length > 0 || errorMessage) && <button aria-label="Clear all saved receipts" title="Clear all receipts saved in this browser" disabled={!hydrated || busy || addingFiles || Boolean(archives)} onClick={clearSavedData}>Clear all</button>}
         {addingFiles && <p role="status">Checking selected receipts…</p>}
         {busy && queueRun && queueRun.completed < queueRun.total - 1 && <button aria-label={queueRun?.stopping ? "Stopping after current receipt" : "Stop queue after current receipt"} disabled={queueRun?.stopping} onClick={() => { stopRequested.current = true; setQueueRun((run) => run && ({ ...run, stopping: true })); }}><Square className="mr-2 inline h-4 w-4" aria-hidden="true" />{queueRun?.stopping ? "Stopping…" : "Stop queue"}</button>}
         </div>
@@ -887,15 +913,21 @@ export default function Home() {
         {legacy && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3">You are recovering receipts saved at the old address. Finish reviewing and export them here. Saved work stays here until cleared or expired. <a className="underline font-semibold" href="https://receipt-to-form-syahmiharith.vercel.app/">Open the main app</a></div>}
       </section>
       <main className="flex flex-1 flex-col px-4 pb-4 pt-5 sm:px-6 lg:px-8">
+        {archives&&<ArchivePicker sources={archives} slots={Math.max(0,maxFiles-items.length)} onCancel={closeArchives} onAdd={async selection=>{
+          const {extractArchive}=await import("@/lib/receipt-archive");const files:File[]=[];
+          for(let index=0;index<archives.length;index++)if(selection[index].length)files.push(...await extractArchive(archives[index],selection[index]));
+          await handleFiles(files);closeArchives();
+        }}/>}
+
         {items.length === 0 ? (
-          <div className="flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center gap-4">
+          <div className={clsx("flex flex-col items-center justify-center gap-4",!archives&&"min-h-[calc(100vh-10rem)]")}>
             {errorMessage ? (
               <div className="w-full max-w-3xl rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert">
                 {errorMessage}
               </div>
             ) : null}
-            <UploadDropzone canAddMore={canAddMore && hydrated && !busy} onFiles={handleFiles} />
-            <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles} onClick={loadSamples} className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40"><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>
+            {!archives&&<UploadDropzone canAddMore={canAddMore && hydrated && !busy} onFiles={prepareFiles} />}
+            {!archives&&<button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || Boolean(archives)} onClick={loadSamples} className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-40"><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>}
           </div>
         ) : (
           <section className="mx-auto w-full min-w-0 max-w-5xl">
@@ -920,7 +952,7 @@ export default function Home() {
                   onAddLine={addLine}
                   onRemoveLine={removeLine}
                   onRetry={(id) => { void extractSelected([id]); }}
-                  busy={busy}
+                  busy={busy||addingFiles||Boolean(archives)}
                 />
               ))}
             </div>
@@ -933,14 +965,14 @@ export default function Home() {
             busy={busy}
             selectedCount={selectedItems.length}
             canAddMore={canAddMore && hydrated && !busy}
-            canExtractSelected={!busy && !addingFiles && selectedExtractableItems.length > 0}
+            canExtractSelected={!busy && !addingFiles && !archives && selectedExtractableItems.length > 0}
             extractCount={selectedExtractableItems.length}
             canDownloadSelected={completeSelectedItems.length > 0}
             onSelectToggle={() => {
               const shouldSelect = selectedItems.length !== items.length;
               setItems((current) => current.map((item) => ({ ...item, selected: shouldSelect, resultSeen: true })));
             }}
-            onFiles={handleFiles}
+            onFiles={prepareFiles}
             onExtract={() => { void extractSelected(); }}
             hasExtractable={items.some((item) => extractableStatuses.includes(item.status))}
             eligibleCount={completeSelectedItems.length}

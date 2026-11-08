@@ -343,14 +343,14 @@ function ExpandedReceiptDetails({item,onFieldChange,onLineChange,onAddLine,onRem
     <div className="min-w-0 space-y-4">
       {item.errorMessage && <p role="alert" className="text-sm text-rose-700">{item.errorMessage}</p>}
       {item.extraction ? <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange}/>
+        <EditableField item={item} field="merchantName" label="Merchant Name" onFieldChange={onFieldChange}/>
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_5.5rem] gap-3 md:grid-cols-[12rem_5.5rem_minmax(0,1fr)_10rem]">
           <SearchField id={`${item.id}-receiptType`} label="Receipt Type" value={item.formValues.receiptType} options={typeOptions} onChange={value=>onFieldChange(item.id,"receiptType",value)}/>
-        </div>
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
           <CurrencyField id={`${item.id}-currency`} value={item.formValues.currency} error={receiptErrors(item).currency} onChange={value=>onFieldChange(item.id,"currency",value)}/>
-          <EditableField item={item} field="totalAmount" label="Total Amount" inputMode="decimal" onFieldChange={onFieldChange}/>
-          <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange}/>
+          <div className="col-span-2 grid min-w-0 grid-cols-2 gap-3 md:contents">
+            <EditableField item={item} field="totalAmount" label="Total Amount" inputMode="decimal" onFieldChange={onFieldChange}/>
+            <EditableField item={item} field="date" label="Date" type="date" onFieldChange={onFieldChange}/>
+          </div>
         </div>
         <ReceiptInsights item={item} onLineChange={onLineChange} onAddLine={onAddLine} onRemoveLine={onRemoveLine}/>
       </> : <div className="space-y-3 text-sm text-slate-600">
@@ -419,7 +419,7 @@ function EditableField({
   const error = receiptErrors(item)[field];
 
   return (
-    <label className="space-y-1" htmlFor={`${item.id}-${field}`}>
+    <label className="block min-w-0 space-y-1" htmlFor={`${item.id}-${field}`}>
       <span className="text-xs font-semibold text-slate-700">{label}</span>
       <input
         id={`${item.id}-${field}`}
@@ -432,7 +432,7 @@ function EditableField({
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${item.id}-${field}-error` : undefined}
         className={clsx(
-          "min-h-11 w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
+          "min-h-11 w-full min-w-0 rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
           error ? "border-rose-300 bg-rose-50" : "border-slate-200"
         )}
       />

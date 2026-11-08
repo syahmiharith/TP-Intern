@@ -73,7 +73,7 @@ export function CurrencyField({ id, value, error, onChange }: {
       </button>
     </div>
     {open && <ul ref={list} id={`${id}-list`} role="listbox" aria-label="Currencies"
-      className="absolute left-0 right-0 z-30 max-h-60 overflow-auto overscroll-contain rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+      className="absolute right-0 z-30 max-h-60 w-[min(20rem,calc(100vw-4rem))] overflow-auto overscroll-contain rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
       {options.map(({ code, name }, index) => <li key={code} id={`${id}-${code}`} role="option"
         aria-selected={value.trim().toUpperCase() === code} data-active={index === active}
         onMouseDown={(event) => event.preventDefault()}

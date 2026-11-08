@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { ReceiptExtraction, ExtractionErrorCode, receiptExtractionSchema } from "@/lib/receipt";
 import { normalizeReceiptExtraction } from "@/lib/receipt-normalizer";
 
@@ -135,13 +136,42 @@ type ExtractReceiptOptions = {
   model: string;
   timeoutMs?: number;
   beforeRetry?: () => Promise<void>;
+  fallbackModel?: string;
 };
+
+const dailyQuotaModels = new Map<string,{day:string;until?:number}>();
+const quotaDay = new Intl.DateTimeFormat("en-CA",{timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"});
+export function resetGeminiQuotaCacheForTests() { dailyQuotaModels.clear(); }
+
+function isExhaustedModelDay(error:ReceiptExtractionError) {
+  const quotas=error.providerQuota??[];
+  return error.status===429 && quotas.length>0 && quotas.every(quota=>quota.limit?.includes("PerModel") && Number(quota.value)>0)
+    && quotas.some(quota=>quota.limit?.includes("PerDay"));
+}
 
 export async function extractReceiptFromImage(options: ExtractReceiptOptions): Promise<ReceiptExtraction> {
   const attemptOptions = { ...options, timeoutMs: options.timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS };
+  const fallback=options.fallbackModel;
+  const canFallback=Boolean(fallback && fallback!==options.model && /^gemini-[a-zA-Z0-9._-]+$/.test(fallback));
+  const cacheKey=`${options.model}:${createHash("sha256").update(options.apiKey).digest("hex").slice(0,16)}`;
+  const day=quotaDay.format(new Date());
+  const unavailable=dailyQuotaModels.get(cacheKey);
+  const cached=canFallback && unavailable?.day===day && (!unavailable.until||unavailable.until>Date.now());
+  if(cached)console.info("[receipt-extraction] using Gemini fallback",{model:fallback,reason:"known model daily quota"});
+  else dailyQuotaModels.delete(cacheKey);
+  const firstAttempt=cached?{...attemptOptions,model:fallback!}:attemptOptions;
   try {
-    return await extractReceiptAttempt(attemptOptions);
+    return await extractReceiptAttempt(firstAttempt);
   } catch (error) {
+    if (error instanceof ReceiptExtractionError && canFallback && !cached && isExhaustedModelDay(error)) {
+      // A different Gemini model has its own entitlement. Never repeat the exhausted model,
+      // rotate credentials, or bypass account-wide, zero-allocation or unknown quota errors.
+      if(dailyQuotaModels.size>=4)dailyQuotaModels.delete(dailyQuotaModels.keys().next().value!);
+      dailyQuotaModels.set(cacheKey,{day,until:error.retryAfterSeconds?Date.now()+error.retryAfterSeconds*1000:undefined});
+      await options.beforeRetry?.();
+      console.info("[receipt-extraction] using Gemini fallback",{model:fallback,reason:"model daily quota",providerQuota:error.providerQuota});
+      return extractReceiptAttempt({...attemptOptions,model:fallback!});
+    }
     if (!(error instanceof ReceiptExtractionError) || error.code !== "AI_PROVIDER_ERROR" ||
         ![500, 502, 503, 504].includes(error.status)) {
       throw error;
@@ -152,7 +182,7 @@ export async function extractReceiptFromImage(options: ExtractReceiptOptions): P
       status: error.status,
       providerStatus: error.providerStatus
     });
-    return extractReceiptAttempt({ ...attemptOptions, timeoutMs: Math.min(attemptOptions.timeoutMs, 10_000) });
+    return extractReceiptAttempt({ ...firstAttempt, timeoutMs: Math.min(attemptOptions.timeoutMs, 10_000) });
   }
 }
 

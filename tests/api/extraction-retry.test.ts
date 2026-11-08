@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { resetGeminiQuotaCacheForTests } from "@/lib/ai/extract-receipt";
 import { POST } from "@/app/api/extract-receipt/route";
 import { reserveProviderCall } from "@/lib/shared-budget";
 import { resetReceiptExtractionRateLimitForTests } from "@/lib/rate-limit";
@@ -16,6 +17,7 @@ function success() {
 }
 beforeEach(() => {
   vi.useFakeTimers();
+  resetGeminiQuotaCacheForTests();
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   budget.mockReset().mockResolvedValue(null);
   resetReceiptExtractionRateLimitForTests();
@@ -69,4 +71,37 @@ it("logs only bounded quota metadata and retry delay without provider message or
 it("ignores malformed quota details while preserving the original provider failure",async()=>{
  vi.stubGlobal("fetch",vi.fn().mockResolvedValue(Response.json({error:{status:"RESOURCE_EXHAUSTED",details:[null,{violations:"invalid"},{retryDelay:"not a duration"}]}},{status:429})));
  const response=await POST(request());expect(response.status).toBe(429);expect((await response.json()).code).toBe("AI_PROVIDER_ERROR");
+});
+
+function dailyQuota(value="20",limit="GenerateRequestsPerDayPerProjectPerModel-FreeTier"){
+ return Response.json({error:{status:"RESOURCE_EXHAUSTED",details:[{"@type":"type.googleapis.com/google.rpc.QuotaFailure",violations:[{quotaMetric:"generativelanguage.googleapis.com/generate_content_free_tier_requests",quotaId:limit,quotaValue:value}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo",retryDelay:"2202s"}]}},{status:429});
+}
+it("uses one budgeted Gemini fallback for a proven model daily quota",async()=>{
+ const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockResolvedValueOnce(success());vi.stubGlobal("fetch",fetch);
+ expect((await POST(request())).status).toBe(200);expect(fetch).toHaveBeenCalledTimes(2);expect(budget).toHaveBeenCalledTimes(2);
+ expect(fetch.mock.calls[0][0]).toContain("/gemini-2.5-flash:");expect(fetch.mock.calls[1][0]).toContain("/gemini-2.5-flash-lite:");
+});
+it("does not keep contacting a model with a known exhausted daily quota",async()=>{
+ const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);
+ expect((await POST(request())).status).toBe(200);expect((await POST(request())).status).toBe(200);
+ expect(fetch).toHaveBeenCalledTimes(3);expect(budget).toHaveBeenCalledTimes(3);expect(fetch.mock.calls[2][0]).toContain("/gemini-2.5-flash-lite:");
+});
+it.each([["0","GenerateRequestsPerDayPerProjectPerModel-FreeTier"],["20","GenerateRequestsPerDayPerProject"],["20","GenerateRequestsPerMinutePerProjectPerModel-FreeTier"]])("does not route around zero, account-wide or minute quota (%s %s)",async(value,limit)=>{
+ const fetch=vi.fn().mockResolvedValue(dailyQuota(value,limit));vi.stubGlobal("fetch",fetch);expect((await POST(request())).status).toBe(429);expect(fetch).toHaveBeenCalledTimes(1);
+});
+it("stops when both Gemini models are exhausted and preserves the provider reset delay",async()=>{
+ const fetch=vi.fn().mockImplementation(async()=>dailyQuota());vi.stubGlobal("fetch",fetch);const response=await POST(request());expect(response.status).toBe(429);expect(response.headers.get("Retry-After")).toBe("2202");expect(fetch).toHaveBeenCalledTimes(2);expect(budget).toHaveBeenCalledTimes(2);
+});
+it("never calls the fallback when the shared budget cannot reserve another call",async()=>{
+ budget.mockResolvedValueOnce(null).mockResolvedValueOnce(Response.json({error:"Budget reached"},{status:429}));const fetch=vi.fn().mockImplementation(async()=>dailyQuota());vi.stubGlobal("fetch",fetch);expect((await POST(request())).status).toBe(429);expect(fetch).toHaveBeenCalledTimes(1);
+});
+it("returns to the primary model after Google's Pacific daily reset",async()=>{
+ vi.setSystemTime(new Date("2026-11-08T07:59:00Z"));const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);await POST(request());
+ vi.setSystemTime(new Date("2026-11-08T08:01:00Z"));expect((await POST(request())).status).toBe(200);expect(fetch.mock.calls[2][0]).toContain("/gemini-2.5-flash:");
+});
+
+it("keeps the bounded transient retry when starting on a cached Gemini fallback",async()=>{
+ const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);await POST(request());
+ fetch.mockResolvedValueOnce(Response.json({error:{status:"UNAVAILABLE"}},{status:503}));const pending=POST(request());await vi.runAllTimersAsync();expect((await pending).status).toBe(200);
+ expect(fetch).toHaveBeenCalledTimes(4);expect(budget).toHaveBeenCalledTimes(4);expect(fetch.mock.calls[2][0]).toContain("/gemini-2.5-flash-lite:");expect(fetch.mock.calls[3][0]).toContain("/gemini-2.5-flash-lite:");
 });

@@ -86,7 +86,7 @@ it("does not keep contacting a model with a known exhausted daily quota",async()
  expect((await POST(request())).status).toBe(200);expect((await POST(request())).status).toBe(200);
  expect(fetch).toHaveBeenCalledTimes(3);expect(budget).toHaveBeenCalledTimes(3);expect(fetch.mock.calls[2][0]).toContain("/gemini-3.1-flash-lite:");
 });
-it.each([["0","GenerateRequestsPerDayPerProjectPerModel-FreeTier"],["20","GenerateRequestsPerDayPerProject"],["20","GenerateRequestsPerMinutePerProjectPerModel-FreeTier"]])("does not route around zero, account-wide or minute quota (%s %s)",async(value,limit)=>{
+it.each([["Infinity","GenerateRequestsPerDayPerProjectPerModel-FreeTier"],["0","GenerateRequestsPerDayPerProjectPerModel-FreeTier"],["20","GenerateRequestsPerDayPerProject"],["20","GenerateRequestsPerMinutePerProjectPerModel-FreeTier"]])("does not route around zero, account-wide or minute quota (%s %s)",async(value,limit)=>{
  const fetch=vi.fn().mockResolvedValue(dailyQuota(value,limit));vi.stubGlobal("fetch",fetch);expect((await POST(request())).status).toBe(429);expect(fetch).toHaveBeenCalledTimes(1);
 });
 it("stops when both Gemini models are exhausted and preserves the provider reset delay",async()=>{
@@ -104,4 +104,13 @@ it("keeps the bounded transient retry when starting on a cached Gemini fallback"
  const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);await POST(request());
  fetch.mockResolvedValueOnce(Response.json({error:{status:"UNAVAILABLE"}},{status:503}));const pending=POST(request());await vi.runAllTimersAsync();expect((await pending).status).toBe(200);
  expect(fetch).toHaveBeenCalledTimes(4);expect(budget).toHaveBeenCalledTimes(4);expect(fetch.mock.calls[2][0]).toContain("/gemini-3.1-flash-lite:");expect(fetch.mock.calls[3][0]).toContain("/gemini-3.1-flash-lite:");
+});
+it.each(["", "another-provider", "gemini-2.5-flash"])("does not fall back when disabled, non-Gemini or identical (%s)",async model=>{
+ vi.stubEnv("GEMINI_FALLBACK_MODEL",model);const fetch=vi.fn().mockImplementation(async()=>dailyQuota());vi.stubGlobal("fetch",fetch);expect((await POST(request())).status).toBe(429);expect(fetch).toHaveBeenCalledTimes(1);expect(budget).toHaveBeenCalledTimes(1);
+});
+it("rechecks the primary when the provider cooldown expires within the same Pacific day",async()=>{
+ vi.setSystemTime(new Date("2026-11-08T16:00:00Z"));const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>success());vi.stubGlobal("fetch",fetch);await POST(request());await vi.advanceTimersByTimeAsync(2202*1000+1);expect((await POST(request())).status).toBe(200);expect(fetch.mock.calls[2][0]).toContain("/gemini-2.5-flash:");
+});
+it("never makes a third attempt if a daily-quota fallback encounters a transient failure",async()=>{
+ const fetch=vi.fn().mockResolvedValueOnce(dailyQuota()).mockImplementation(async()=>Response.json({error:{status:"UNAVAILABLE"}},{status:503}));vi.stubGlobal("fetch",fetch);const pending=POST(request());await vi.runAllTimersAsync();expect((await pending).status).toBe(503);expect(fetch).toHaveBeenCalledTimes(2);expect(budget).toHaveBeenCalledTimes(2);
 });

@@ -145,7 +145,7 @@ export function resetGeminiQuotaCacheForTests() { dailyQuotaModels.clear(); }
 
 function isExhaustedModelDay(error:ReceiptExtractionError) {
   const quotas=error.providerQuota??[];
-  return error.status===429 && quotas.length>0 && quotas.every(quota=>quota.limit?.includes("PerModel") && Number(quota.value)>0)
+  return error.status===429 && quotas.length>0 && quotas.every(quota=>quota.limit?.includes("PerModel") && Number.isSafeInteger(Number(quota.value)) && Number(quota.value)>0)
     && quotas.some(quota=>quota.limit?.includes("PerDay"));
 }
 

@@ -60,6 +60,13 @@ type GeminiResponse = {
   error?: {
     message?: string;
     status?: string;
+    details?: Array<{
+      "@type"?: string;
+      retryDelay?: string;
+      reason?: string;
+      metadata?: Record<string,string>;
+      violations?: Array<{quotaMetric?:string;quotaId?:string;quotaValue?:string}>;
+    }>;
   };
 };
 
@@ -67,6 +74,9 @@ export class ReceiptExtractionError extends Error {
   code: ExtractionErrorCode;
   status: number;
   providerStatus?: string;
+  providerQuota?: {metric?:string;limit?:string;value?:string}[];
+  providerReason?: string;
+  retryAfterSeconds?: number;
 
   constructor(code: ExtractionErrorCode, message: string, status: number) {
     super(message);
@@ -205,6 +215,18 @@ async function extractReceiptAttempt({ file, apiKey, model, timeoutMs }: Extract
     const providerStatus = geminiJson.error?.status;
     if (providerStatus && /^[A-Z_]{1,64}$/.test(providerStatus)) {
       error.providerStatus = providerStatus;
+    }
+    const details=Array.isArray(geminiJson.error?.details)?geminiJson.error.details.filter(detail=>detail&&typeof detail==="object").slice(0,10):[];
+    const safe=(value:unknown)=>typeof value==="string"&&/^[a-zA-Z0-9_./-]{1,180}$/.test(value)?value:undefined;
+    error.providerQuota=details.flatMap(detail=>[
+      ...(Array.isArray(detail.violations)?detail.violations.filter(violation=>violation&&typeof violation==="object"):[]).map(violation=>({metric:safe(violation.quotaMetric),limit:safe(violation.quotaId),value:safe(violation.quotaValue)})),
+      ...(detail.metadata?.quota_metric?[{metric:safe(detail.metadata.quota_metric),limit:safe(detail.metadata.quota_limit),value:safe(detail.metadata.quota_limit_value)}]:[])
+    ]).filter(quota=>quota.metric||quota.limit).slice(0,10);
+    error.providerReason=details.map(detail=>detail.reason).find(reason=>typeof reason==="string"&&/^[A-Z_]{1,64}$/.test(reason));
+    const retryDelay=details.find(detail=>detail["@type"]==="type.googleapis.com/google.rpc.RetryInfo")?.retryDelay;
+    if(typeof retryDelay==="string"&&/^\d+(?:\.\d+)?s$/.test(retryDelay)){
+      const seconds=Math.ceil(Number(retryDelay.slice(0,-1)));
+      if(seconds>0&&seconds<=86400)error.retryAfterSeconds=seconds;
     }
     throw error;
   }

@@ -100,7 +100,8 @@ async function extract(request: Request, requestId: string) {
   } catch (error) {
     if (error instanceof ReceiptExtractionError) {
       console.warn("[receipt-extraction] extraction failed", {
-        requestId, code: error.code, status: error.status, providerStatus: error.providerStatus
+        requestId, code: error.code, status: error.status, providerStatus: error.providerStatus,
+        providerQuota: error.providerQuota, providerReason: error.providerReason, retryAfterSeconds: error.retryAfterSeconds
       });
       const response = errorResponse(error.code, error.message, error.status);
       if (error.code === "RATE_LIMITED" && error.status === 429) response.headers.set("Retry-After", "60");

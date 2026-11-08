@@ -20,7 +20,7 @@ beforeEach(() => {
   budget.mockReset().mockResolvedValue(null);
   resetReceiptExtractionRateLimitForTests();
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 it("recovers from transient failure and reserves every attempt", async () => {
   const fetch = vi.fn().mockResolvedValueOnce(Response.json({ error: { status: "UNAVAILABLE" } }, { status: 503 })).mockResolvedValueOnce(success());
   vi.stubGlobal("fetch", fetch);
@@ -55,4 +55,18 @@ it("bounds persistent transient failures to two provider calls", async () => {
   await vi.runAllTimersAsync();
   expect((await pending).status).toBe(503);
   expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it("logs only bounded quota metadata and retry delay without provider message or project identifiers",async()=>{
+ const warning=vi.spyOn(console,"warn").mockImplementation(()=>{});
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue(Response.json({error:{status:"RESOURCE_EXHAUSTED",message:"private provider message",details:[{"@type":"type.googleapis.com/google.rpc.QuotaFailure",violations:[{quotaMetric:"generativelanguage.googleapis.com/generate_content_free_tier_requests",quotaId:"GenerateRequestsPerMinutePerProjectPerModel-FreeTier",quotaValue:"2",quotaDimensions:{project:"private-project"}}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo",retryDelay:"12.3s"}]}},{status:429})));
+ const response=await POST(request());expect(response.status).toBe(429);
+ const failure=warning.mock.calls.find(call=>call[0]==="[receipt-extraction] extraction failed")![1];
+ expect(failure).toMatchObject({retryAfterSeconds:13,providerQuota:[{metric:"generativelanguage.googleapis.com/generate_content_free_tier_requests",limit:"GenerateRequestsPerMinutePerProjectPerModel-FreeTier",value:"2"}]});
+ expect(JSON.stringify(failure)).not.toContain("private provider message");expect(JSON.stringify(failure)).not.toContain("private-project");expect(JSON.stringify(await response.json())).not.toContain("providerQuota");
+});
+
+it("ignores malformed quota details while preserving the original provider failure",async()=>{
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue(Response.json({error:{status:"RESOURCE_EXHAUSTED",details:[null,{violations:"invalid"},{retryDelay:"not a duration"}]}},{status:429})));
+ const response=await POST(request());expect(response.status).toBe(429);expect((await response.json()).code).toBe("AI_PROVIDER_ERROR");
 });

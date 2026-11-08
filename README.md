@@ -17,7 +17,7 @@ Receipt-to-Form turns receipt images into editable expenses and line items. Corr
 
 ## Quick Path
 
-1. Upload one to five JPG, PNG or WebP receipts, or choose the optional samples.
+1. Upload one to five JPG, PNG or WebP receipts, select images from a ZIP, or choose the optional samples.
 2. Extract uploaded receipts and compare each result with its image.
 3. Expand a row to correct fields and edit item names, quantities and prices. Changes save automatically; no approval or manual Save action is required.
 4. Use the batch toolbar's **Export expenses CSV** for valid selected receipts and current line items. **Export JSON** retains original provenance.
@@ -39,7 +39,7 @@ Key product decisions:
 ## What I Built
 
 - Upload queue for up to five receipt images.
-- Supported files: JPG, PNG, WEBP, max 5MB each.
+- Supported images: JPG, PNG, WEBP, max 5MB each. ZIP import opens locally and lists entries for selection before adding images to the same queue. A ZIP selection may contain up to 25MB and 200 entries. Unsupported files are listed but unavailable; folders and system metadata are omitted. Nested archives are not opened. Only selected images are decompressed, checked against the image size limit, and added; extraction remains a separate action.
 - Auto-selection for newly uploaded files.
 - Preview modal for every uploaded receipt.
 - Selected-file extraction with sequential API calls.
@@ -184,7 +184,7 @@ The AI handles uncertain visual extraction. Deterministic application code owns 
 ## Reliability And Security
 
 - `GEMINI_API_KEY` is never exposed to the browser.
-- Uploads are restricted to JPG, PNG, and WEBP on both client and server.
+- Extraction accepts JPG, PNG, and WEBP on both client and server. ZIP files are opened only in the browser; the API receives selected images individually.
 - Files above 5MB are rejected before extraction.
 - Gemini responses are parsed and validated before reaching the UI.
 - Required fields must be valid before a result becomes downloadable.

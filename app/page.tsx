@@ -82,6 +82,7 @@ type ExtractApiResponse = {
 };
 
 const maxFiles = 5;
+const extractionConcurrency = 2;
 const extractableStatuses: QueueStatus[] = ["ready", "failed"];
 
 function createQueueItemId() {
@@ -598,11 +599,12 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const storageReady = useRef(false);
   const stopRequested = useRef(false);
-  const extracting = useRef(false);
+  const extracting = useRef(new Set<string>());
+  const queueRunning = useRef(false);
   const uploadInProgress = useRef(false);
   const [addingFiles, setAddingFiles] = useState(false);
   const [archives,setArchives] = useState<ArchiveSource[]|null>(null);
-  const [queueRun, setQueueRun] = useState<{ completed: number; total: number; stopping: boolean; stopped: boolean } | null>(null);
+  const [queueRun, setQueueRun] = useState<{ completed: number; started: number; total: number; stopping: boolean; stopped: boolean; pauseReason?: string } | null>(null);
   const itemsRef = useRef<ReceiptQueueItem[]>([]);
 
   const selectedItems = useMemo(() => items.filter((item) => item.selected), [items]);
@@ -637,7 +639,15 @@ export default function Home() {
   }, [items]);
 
   useEffect(() => {
+    // Navigation can reject fetches before React unmounts, especially in Safari.
+    // Stop workers before those rejections could claim another queued receipt.
+    const stopDispatch = () => { stopRequested.current = true; };
+    window.addEventListener("beforeunload", stopDispatch);
+    window.addEventListener("pagehide", stopDispatch);
     return () => {
+      stopDispatch();
+      window.removeEventListener("beforeunload", stopDispatch);
+      window.removeEventListener("pagehide", stopDispatch);
       itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     };
   }, []);
@@ -763,8 +773,8 @@ export default function Home() {
 
   async function extractSingleItem(id: string) {
     const item = itemsRef.current.find((candidate) => candidate.id === id);
-    if (!item || extracting.current || !extractableStatuses.includes(item.status)) return;
-    extracting.current = true;
+    if (!item || extracting.current.has(id) || !extractableStatuses.includes(item.status)) return;
+    extracting.current.add(id);
 
     updateItem(id, (current) => ({
       ...current,
@@ -788,6 +798,10 @@ export default function Home() {
       const payload = (await response.json()) as ExtractApiResponse;
 
       if (!response.ok || !payload.data) {
+        if(response.status===429||payload.code==="RATE_LIMITED"){
+          stopRequested.current=true;
+          setQueueRun(run=>run&&({...run,stopping:true,pauseReason:payload.error||"Extraction limit reached. Retry later or use samples."}));
+        }
         throw new Error(payload.error || "Receipt extraction failed.");
       }
 
@@ -823,26 +837,36 @@ export default function Home() {
         resultSeen: false
       }));
     } finally {
-      extracting.current = false;
+      extracting.current.delete(id);
     }
   }
 
   async function extractSelected(ids?: string[]) {
-    if (busy) return;
+    // The ref guards repeated clicks before React has committed the busy state.
+    if (queueRunning.current || uploadInProgress.current || archives) return;
+    queueRunning.current = true;
     setBusy(true);
     stopRequested.current = false;
-    const targets = items.filter((item) => (ids ? ids.includes(item.id) : item.selected) && extractableStatuses.includes(item.status));
-    setQueueRun({ completed: 0, total: targets.length, stopping: false, stopped: false });
+    const targets = itemsRef.current.filter((item) => (ids ? ids.includes(item.id) : item.selected) && extractableStatuses.includes(item.status));
+    setQueueRun({ completed: 0, started: 0, total: targets.length, stopping: false, stopped: false });
+    let next = 0;
     let completed = 0;
-
-    for (const item of targets) {
-      if (stopRequested.current) break;
-      await extractSingleItem(item.id);
-      completed += 1;
-      setQueueRun((run) => run && ({ ...run, completed }));
+    async function worker() {
+      while (!stopRequested.current && next < targets.length) {
+        const item = targets[next++];
+        setQueueRun(run=>run&&({...run,started:run.started+1}));
+        await extractSingleItem(item.id);
+        completed += 1;
+        setQueueRun(run=>run&&({...run,completed:run.completed+1}));
+      }
     }
-    setQueueRun((run) => run && ({ ...run, stopped: completed < targets.length, stopping: false }));
-    setBusy(false);
+    try {
+      await Promise.all(Array.from({length:Math.min(extractionConcurrency,targets.length)},worker));
+    } finally {
+      setQueueRun(run=>run&&({...run,stopped:completed<targets.length,stopping:false}));
+      queueRunning.current = false;
+      setBusy(false);
+    }
   }
 
   function updateField(id: string, field: keyof ReceiptFormValues, value: string) {
@@ -905,9 +929,10 @@ export default function Home() {
         {items.length > 0 && <button title="Add two synthetic receipts" disabled={legacy || !hydrated || busy || addingFiles || Boolean(archives) || items.length > 3} onClick={loadSamples}><Files className="mr-2 inline h-4 w-4" aria-hidden="true" />Try samples</button>}
         {(items.length > 0 || errorMessage) && <button aria-label="Clear all saved receipts" title="Clear all receipts saved in this browser" disabled={!hydrated || busy || addingFiles || Boolean(archives)} onClick={clearSavedData}>Clear all</button>}
         {addingFiles && <p role="status">Checking selected receipts…</p>}
-        {busy && queueRun && queueRun.completed < queueRun.total - 1 && <button aria-label={queueRun?.stopping ? "Stopping after current receipt" : "Stop queue after current receipt"} disabled={queueRun?.stopping} onClick={() => { stopRequested.current = true; setQueueRun((run) => run && ({ ...run, stopping: true })); }}><Square className="mr-2 inline h-4 w-4" aria-hidden="true" />{queueRun?.stopping ? "Stopping…" : "Stop queue"}</button>}
+        {busy && queueRun && queueRun.started < queueRun.total && <button aria-label={queueRun?.stopping ? "Finishing active receipts" : "Stop remaining receipts"} disabled={queueRun?.stopping} onClick={() => { stopRequested.current = true; setQueueRun((run) => run && ({ ...run, stopping: true })); }}><Square className="mr-2 inline h-4 w-4" aria-hidden="true" />{queueRun?.stopping ? "Stopping…" : "Stop queue"}</button>}
         </div>
-        {queueRun && <p role="status" className="text-slate-600">{queueRun.completed} of {queueRun.total} processed{queueRun.stopped ? " · Stopped" : ""}</p>}
+        {queueRun && <p role="status" className="text-slate-600">{queueRun.completed} of {queueRun.total} processed{queueRun.stopped ? queueRun.pauseReason ? " · Paused" : " · Stopped" : ""}</p>}
+        {queueRun?.stopped && queueRun.pauseReason && <p role="status" className="text-sm text-slate-600">{queueRun.pauseReason}</p>}
         {!hydrated && <p role="status" className="text-slate-600">Loading saved receipts…</p>}
         {removedToast && <p role="status" className="text-slate-600">{removedToast}</p>}
         {legacy && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3">You are recovering receipts saved at the old address. Finish reviewing and export them here. Saved work stays here until cleared or expired. <a className="underline font-semibold" href="https://receipt-to-form-syahmiharith.vercel.app/">Open the main app</a></div>}

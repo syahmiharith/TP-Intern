@@ -32,7 +32,7 @@ The workflow combines receipt upload, generative AI extraction, editable review,
 Key product decisions:
 
 - AI creates the first draft; the user remains responsible for uncertain or incomplete fields.
-- Batch queue UX supports up to five receipts while keeping extraction sequential to reduce quota risk.
+- Batch queue UX supports up to five receipts with up to two extractions running concurrently.
 - Export uses current valid fields and line items, without an approval gate.
 - The backend stays small: one secure `POST /api/extract-receipt` route handles validation, rate limiting, and Gemini calls.
 
@@ -42,7 +42,7 @@ Key product decisions:
 - Supported images: JPG, PNG, WEBP, max 5MB each. ZIP import opens locally and lists entries for selection before adding images to the same queue. A ZIP selection may contain up to 25MB and 200 entries. Unsupported files are listed but unavailable; folders and system metadata are omitted. Nested archives are not opened. Only selected images are decompressed, checked against the image size limit, and added; extraction remains a separate action.
 - Auto-selection for newly uploaded files.
 - Preview modal for every uploaded receipt.
-- Selected-file extraction with sequential API calls.
+- Selected-file extraction with at most two concurrent API calls. Stop queue finishes active requests and leaves the rest queued; rate-limit and budget responses pause remaining work. Per-IP and global daily limits remain enforced on the server.
 - One row status: queued, extracting, ready, needs attention or failed.
 - Bottom-edge progress indicator and left-edge result status indicator.
 - Receipt type classification.

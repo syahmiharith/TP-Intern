@@ -139,22 +139,22 @@ test("stopping the queue preserves completed receipts and remaining receipts sta
     calls += 1;
     active += 1;
     maxActive = Math.max(maxActive, active);
-    if (calls === 1) await gate;
+    if (calls <= 2) await gate;
     await route.fulfill({ json: { data: highConfidenceExtraction } });
     active -= 1;
   });
   await uploadReceipts(page, files(3));
   await page.getByRole("button", { name: "Extract 3 files", exact: true }).click();
-  await expect.poll(() => calls).toBe(1);
-  await page.getByRole("button", { name: "Stop queue after current receipt", exact: true }).click();
+  await expect.poll(() => calls).toBe(2);
+  await page.getByRole("button", { name: "Stop remaining receipts", exact: true }).click();
   release();
-  await expect(page.getByRole("button", { name: "Extract 2 files", exact: true })).toBeEnabled();
-  expect(calls).toBe(1);
-  await expect(page.locator("article").getByText("Queued", { exact: true })).toHaveCount(2);
-  await page.getByRole("button", { name: "Extract 2 files", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Extract 1 file", exact: true })).toBeEnabled();
+  expect(calls).toBe(2);
+  await expect(page.locator("article").getByText("Queued", { exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Extract 1 file", exact: true }).click();
   await expect(page.locator("article").getByText("Ready",{exact:true})).toHaveCount(3);
   expect(calls).toBe(3);
-  expect(maxActive).toBe(1);
+  expect(maxActive).toBe(2);
 });
 
 test("duplicate content is skipped and the five-receipt boundary is enforced", async ({ page }) => {

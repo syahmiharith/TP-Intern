@@ -1,6 +1,6 @@
 # Receipt-to-Form
 
-> Designed, built and maintained by [Zulsyahmi Zulkefli](https://portfolio-syahmiharith.vercel.app). [Product case study](https://portfolio-syahmiharith.vercel.app/work/receipt-to-form) · [Release checks](docs/REVIEW_GUIDE.md) · [Demo script](docs/DEMO_SCRIPT.md). Older review-gate release notes below are historical.
+> Designed, built and maintained by [Zulsyahmi Zulkefli](https://portfolio-syahmiharith.vercel.app). [Product case study](https://portfolio-syahmiharith.vercel.app/work/receipt-to-form) · [Release checks](docs/REVIEW_GUIDE.md) · [Demo script](docs/DEMO_SCRIPT.md).
 
 
 Receipt-to-Form turns receipt images into editable expenses and line items. Corrections save automatically, and valid selected receipts export directly as CSV with secondary provenance JSON.
@@ -128,7 +128,7 @@ Success:
 }
 ```
 
-Partial extraction still returns `200` with missing values as `null` and `confidence: "low"`. The frontend then marks the row as `Needs review`.
+Partial extraction still returns `200` with missing values as `null` and `confidence: "low"`. The frontend then marks the row as `Needs attention`.
 
 Error:
 
@@ -160,8 +160,8 @@ Next.js frontend
  - upload up to 5 receipts
  - select files
  - preview images
- - review and edit extracted fields
- - export reviewed CSV
+ - correct expense fields and line items
+ - export current valid values as CSV or JSON
  ↓
 POST /api/extract-receipt
  - server-side file validation
@@ -174,9 +174,9 @@ Gemini Vision
  ↓
 Validated extraction draft
  ↓
-Human review queue
+Editable receipt queue
  ↓
-Reviewed CSV export
+CSV or JSON export
 ```
 
 The AI handles uncertain visual extraction. Deterministic application code owns validation, completeness rules, UI state, downloads, and safe failure handling.
@@ -188,7 +188,7 @@ The AI handles uncertain visual extraction. Deterministic application code owns 
 - Files above 5MB are rejected before extraction.
 - Gemini responses are parsed and validated before reaching the UI.
 - Required fields must be valid before a result becomes downloadable.
-- `Needs review` results show red field-level validation and inline receipt preview.
+- `Needs attention` results show red field-level validation and inline receipt preview.
 - API failures return machine-readable error codes with safe public messages.
 - Gemini requests use a timeout so the route does not wait indefinitely.
 - Repeated extraction requests are rate limited per client IP.
@@ -290,23 +290,23 @@ http://localhost:3000
 
 - Only image receipts are supported; PDF support is intentionally out of scope.
 - Extraction quality depends on receipt clarity and Gemini availability.
-- Queue state is client-side only and resets on refresh.
-- Rate limiting is in-memory, and is not a distributed production limiter.
-- A production version could add durable storage, authentication, OCR fallbacks, audit history, and Redis or Vercel KV rate limiting.
+- Receipts and corrections are saved on the current device. Browser storage can be cleared or evicted.
+- Live extraction requires shared Redis limits; samples remain available when extraction is unavailable.
+- Receipts remain account-free and device-local; cross-device synchronization is outside the current scope.
 
 ## Project Origin
 
-Originally developed as a recruitment assessment, this repository is presented as a portfolio project. It is not a production client system or a claim of employment. The original development history and MIT license are preserved.
+Originally developed as a recruitment assessment, Receipt-to-Form has evolved into a complete expense workflow. The original development history and MIT license are preserved.
 
-## Expense review release
+## Expense workflow
 
-Try two synthetic receipts without a provider call. Correct the stationery receipt against its image, save the change, mark it reviewed, and export expenses CSV. Editing a reviewed receipt blocks its export until it is saved and reviewed again. Discard restores the saved revision and its review status. Original model confidence remains separate from human review.
+Try two synthetic receipts without a provider call. Correct the stationery total against its image and export through **Export → CSV**. Corrections save automatically. Invalid fields exclude the affected receipt until corrected; valid selected receipts export directly. Original extraction confidence remains separate from human changes.
 
-Images, pending edits, saved revisions and review status are stored in IndexedDB on this device, expiring seven days after editing. Browser storage can be evicted. Delete batch clears stored work. Interrupted extraction requires a manual retry. Expanded item editing and item CSV are deferred pending pilot evidence.
+Images, expense fields, line items and queue state are stored in IndexedDB on this device, expiring seven days after the last edit. Browser storage can be evicted. Clear all removes the saved batch. Interrupted requests become manually retryable. **Extract** only sends selected queued or failed receipts; successful results and corrections stay intact. JSON separates current values and items from original extraction and any historical review metadata.
 
 Production live extraction requires `GEMINI_API_KEY` and Redis REST credentials. The Vercel Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically. Explicit `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` values take precedence. The Redis REST service must support EVAL. Reservations enforce 15 requests per IP per UTC minute and a global UTC daily budget, configured with `PROVIDER_DAILY_BUDGET` (default 100). Missing or unavailable budget storage blocks live extraction while samples remain available. Use the deployment platform's trusted proxy headers for client IPs.
 
-Release verification requires the automated checks, deployed sample correction and CSV download, and a separate synthetic real-provider receipt. Roll back the deployment if exports differ from reviewed values or storage recovery loses edits. Never log receipt contents.
+Release verification requires the automated checks, deployed sample correction and CSV download, and a separate synthetic real-provider receipt. Roll back the deployment if exports differ from current valid values or storage recovery loses edits. Never log receipt contents.
 
 Pilot evidence is pending. Observe five expense preparers processing three synthetic receipts and opening the CSV in their usual spreadsheet. Record unaided completion counts, errors, time versus manual entry and cleanup. Retest shipped improvements with affected participants and record voluntary return use separately. No participant results are claimed by this release.
 

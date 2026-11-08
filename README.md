@@ -71,7 +71,7 @@ Key product decisions:
 The API uses Gemini through `POST /api/extract-receipt`. By default, the app uses:
 
 ```bash
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 The extraction prompt asks Gemini to return strict JSON only, with these fields:
@@ -261,7 +261,7 @@ Add Gemini configuration:
 
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 Run locally:
@@ -312,7 +312,7 @@ Pilot evidence is pending. Observe five expense preparers processing three synth
 
 Transient provider failures (HTTP 500/502/503/504) get one retry after a short backoff, preserving the initial 45-second timeout and limiting the retry to 10 seconds. Every attempt reserves shared budget before calling Gemini. Unknown, minute, account-wide, zero-allocation and credential limits are not retried. A confirmed positive model-specific daily quota may use one configured Gemini fallback (`GEMINI_FALLBACK_MODEL`, default `gemini-3.1-flash-lite`; empty disables it). The unavailable primary is remembered within a warm server instance until the provider cooldown or Pacific daily reset; cold instances may rediscover the limit. Fallback and transient retry together remain bounded to two provider attempts per request. No other provider, key rotation, billing upgrade or quota increase is performed. Safe quota identifiers and retry delay are logged; raw messages, project identifiers, keys and receipt content are excluded. If both models lack allowance, extraction stops with the provider reset delay rather than cycling through models.
 
-Keep `GEMINI_MODEL=gemini-2.5-flash` as the primary, with optional `GEMINI_FALLBACK_MODEL=gemini-3.1-flash-lite` for confirmed model-specific daily exhaustion. Preview verification exercised the fallback and returned the correct USD 12.50 and USD 23.75 results for both synthetic receipts. Source identity, original model confidence and CSV values remain covered by the workflow tests.
+Pin `GEMINI_MODEL=gemini-3.1-flash-lite` as the primary. The legacy 2.5 primary reached its daily allowance and subsequently returned UNAVAILABLE after the reset; the current stable model removes that legacy dependency. An optional `GEMINI_FALLBACK_MODEL` must differ from the primary to be used; leave it empty when no alternate Gemini model is configured. Preview verification returned the correct USD 12.50 and USD 23.75 results for both synthetic receipts. Source identity, original model confidence and CSV values remain covered by the workflow tests.
 
 
 ## Runtime verification coverage

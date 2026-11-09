@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: light;
-  background: #f8fafc;
+  background: #f8f7f5;
 }
 
 * {
@@ -13,9 +13,14 @@
 
 body {
   margin: 0;
+  /* A static pearl finish: broad color reflections beneath a soft white sheen. */
   background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 34rem),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    linear-gradient(118deg, transparent 18%, rgba(255, 255, 255, 0.78) 43%, transparent 64%),
+    radial-gradient(ellipse at 6% 12%, rgba(213, 204, 241, 0.64), transparent 48%),
+    radial-gradient(ellipse at 94% 20%, rgba(204, 230, 222, 0.65), transparent 47%),
+    radial-gradient(ellipse at 72% 68%, rgba(246, 218, 209, 0.58), transparent 48%),
+    radial-gradient(ellipse at 12% 89%, rgba(203, 221, 240, 0.60), transparent 46%),
+    linear-gradient(155deg, #faf8f2 0%, #f5f3fa 48%, #f8f7f1 100%);
   color: #0f172a;
 }
 

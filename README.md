@@ -1,326 +1,67 @@
 # Receipt-to-Form
 
-> Designed, built and maintained by [Zulsyahmi Zulkefli](https://portfolio-syahmiharith.vercel.app). [Product case study](https://portfolio-syahmiharith.vercel.app/work/receipt-to-form) · [Release checks](docs/REVIEW_GUIDE.md) · [Demo script](docs/DEMO_SCRIPT.md).
+Turn receipt images into editable expenses and line items. Check the extracted fields beside the original image, correct them and export the current values.
 
+[Try demo](https://receipt-to-form-syahmiharith.vercel.app/) · [Case study](https://zsyahmi.dev/work/receipt-to-form) · [Release checks](docs/REVIEW_GUIDE.md)
 
-Receipt-to-Form turns receipt images into editable expenses and line items. Corrections save automatically, and valid selected receipts export directly as CSV with secondary provenance JSON.
+## Try a receipt
 
-**Run the app:** follow [Getting Started](#getting-started).
+1. Choose the public samples, or upload up to five JPG, PNG or WebP images. ZIP import lets you select images before adding them.
+2. Extract uploaded receipts with a private pilot code. Samples need no code or provider call.
+3. Expand a row to inspect the image and edit expense fields or line items. Corrections save automatically.
+4. Select valid receipts and choose **Export → CSV**. JSON also preserves the original extraction separately.
 
-**Public samples · private pilot extraction:** <https://receipt-to-form-syahmiharith.vercel.app/>
+Invalid fields exclude the affected receipt until corrected. There is no approval gate or manual Save step.
 
-**Walkthrough:** [Demo Script](./docs/DEMO_SCRIPT.md). The earlier recording is retained in Git history, not presented as a current UI demonstration.
+## Decisions in the implementation
 
-**Setup shortcuts:** [Getting Started](#getting-started) · [Deployment](#deployment)
+**The source stays beside the draft.** Image zoom, rotation and panning support checking uncertain fields without leaving the editor. Missing amounts remain blank rather than being guessed.
 
-**Reviewer docs:** [Testing Guide](./TESTING.md) · [Review Guide](./docs/REVIEW_GUIDE.md) · [Demo Script](./docs/DEMO_SCRIPT.md)
+**Export follows the edited record.** CSV uses current valid values and line items. JSON keeps those values separate from original extraction and confidence, so a human correction does not rewrite model provenance.
 
-## Quick Path
-
-1. Upload one to five JPG, PNG or WebP receipts, select images from a ZIP, or choose the optional samples.
-2. Enter your private pilot code to extract uploaded receipts, then compare each result with its image. Public samples need no code. If a request fails, **Extract** retries selected failed receipts without re-extracting successful results or replacing their corrections.
-3. Expand a row to correct fields and edit item names, quantities and prices. Changes save automatically; no approval or manual Save action is required.
-4. Use **Export → CSV** in the batch toolbar for valid selected receipts and current line items. **Export → JSON** retains original provenance.
-5. Invalid fields exclude a receipt until corrected. Refresh restores current corrections and line items. Model confidence remains unchanged and never gates export.
-
-The branded address above is the main entry. The older tp-intern-malaysia address keeps a recovery workflow for existing saved receipts; finish and export there before clearing them and continuing to the main app.
-
-Live extraction is invite-only during the pilot. Codes expire and have a server-enforced allowance. See [Pilot security controls](docs/SECURITY.md) for issuance, revocation, limits and verification.
-
-## Product decisions
-
-I designed the workflow around one useful outcome: expense records that match the values on screen. Import, extraction, corrections, recovery and export stay in the same workspace.
-
-Key product decisions:
-
-- AI creates the first draft; the user remains responsible for uncertain or incomplete fields.
-- Batch queue UX supports up to five receipts with up to two extractions running concurrently.
-- Export uses current valid fields and line items, without an approval gate.
-- The backend stays small: one secure `POST /api/extract-receipt` route handles validation, rate limiting, and Gemini calls.
-
-## What I Built
-
-- Upload queue for up to five receipt images.
-- Supported images: JPG, PNG, WEBP, max 5MB each. ZIP import opens locally and lists entries for selection before adding images to the same queue. A ZIP selection may contain up to 25MB and 200 entries. Unsupported files are listed but unavailable; folders and system metadata are omitted. Nested archives are not opened. Only selected images are decompressed, checked against the image size limit, and added; extraction remains a separate action.
-- Auto-selection for newly uploaded files.
-- Preview modal for every uploaded receipt.
-- Selected-file extraction with at most two concurrent API calls. Stop queue finishes active requests and leaves the rest queued; rate-limit and budget responses pause remaining work. Per-IP and global daily limits remain enforced on the server.
-- One row status: queued, extracting, ready, needs attention or failed.
-- Bottom-edge progress indicator and left-edge result status indicator.
-- Receipt type classification.
-- Extraction of merchant name, date, total amount, currency, confidence, notes, and line items.
-- Editable details panel for manual correction.
-- Zoom, rotate and pan the inline image beside the expanded editor.
-- Red validation states for missing required fields.
-- CSV exports current valid selected receipts and appends a structured `items` column.
-- Version-2 JSON separates current values/items, original extraction and historical review metadata.
-
-## Implementation
-
-| Area | Implementation |
-| --- | --- |
-| API key safety | Gemini key is used only in the server-side API route. |
-| Input validation | File type and size are checked before extraction. |
-| Output validation | Gemini output is parsed, normalized, and validated with Zod. |
-| Direct export | Valid values can export at any confidence level. Invalid data is flagged inline. |
-| Abuse protection | Shared limits allow 15 calls per IP per minute and 100 provider calls per UTC day. |
-| Test strategy | Default tests mock Gemini for deterministic CI. |
-| Real integration | Optional live Gemini Playwright smoke test validates the real API path. |
-| Deployment readiness | Vercel build, analytics, speed insights, and safe error messages are included. |
-
-## AI Model And Prompt
-
-The API uses Gemini through `POST /api/extract-receipt`. By default, the app uses:
-
-```bash
-GEMINI_MODEL=gemini-3.1-flash-lite
-```
-
-The extraction prompt asks Gemini to return strict JSON only, with these fields:
-
-- `merchantName`
-- `receiptType`
-- `currency`
-- `totalAmount`
-- `date`
-- `confidence`
-- `notes`
-- `items`
-
-Important prompt rules:
-
-- Do not guess unreadable values.
-- Use `null` for missing or unclear fields.
-- Classify receipt type into a fixed category list.
-- Format dates as `YYYY-MM-DD` when possible.
-- Return line items only when visible.
-- Add short uncertainty notes for blurry, hidden, or ambiguous fields.
-
-## API Contract
-
-### `POST /api/extract-receipt`
-
-Request:
-
-- `multipart/form-data`
-- field: `receipt`
-- accepted MIME types: `image/jpeg`, `image/png`, `image/webp`
-- max size: `5MB`
-
-Success:
-
-```json
-{
-  "data": {
-    "merchantName": "AEON Wellness",
-    "receiptType": "Groceries",
-    "currency": "MYR",
-    "totalAmount": 43.8,
-    "date": "2026-05-12",
-    "confidence": "high",
-    "notes": [],
-    "items": [
-      {
-        "name": "Gardenia Bread",
-        "quantity": 1,
-        "value": 3.8
-      }
-    ]
-  }
-}
-```
-
-Partial extraction still returns `200` with missing values as `null` and `confidence: "low"`. The frontend then marks the row as `Needs attention`.
-
-Error:
-
-```json
-{
-  "code": "FILE_TOO_LARGE",
-  "error": "Receipt image must be 5MB or smaller."
-}
-```
-
-Current error codes:
+**Recovery is part of the workflow.** Receipts, images and corrections persist in IndexedDB on the current device. Failed extractions can be retried without replacing successful results or edits.
 
 ```text
-NO_RECEIPT_UPLOADED
-INVALID_FILE_TYPE
-FILE_TOO_LARGE
-RATE_LIMITED
-AI_PROVIDER_ERROR
-INVALID_AI_RESPONSE
-UNKNOWN_ERROR
+Images / ZIP selection → receipt queue → extraction draft
+                                              ↓
+                                  image + editable fields
+                                              ↓
+                                  current CSV / provenance JSON
 ```
 
-## Architecture
+Gemini handles visual extraction through one server-side API route. Application code validates files and provider output, manages the queue and writes exports. The stack is Next.js, React, TypeScript, Zod and IndexedDB.
 
-```text
-User
- ↓
-Next.js frontend
- - upload up to 5 receipts
- - select files
- - preview images
- - correct expense fields and line items
- - export current valid values as CSV or JSON
- ↓
-POST /api/extract-receipt
- - server-side file validation
- - per-IP rate limiting
- - Gemini request
- - JSON extraction and normalization
- - Zod validation
- ↓
-Gemini Vision
- ↓
-Validated extraction draft
- ↓
-Editable receipt queue
- ↓
-CSV or JSON export
-```
+## Maintenance evidence
 
-The AI handles uncertain visual extraction. Deterministic application code owns validation, completeness rules, UI state, downloads, and safe failure handling.
+The [Zod 4 upgrade](https://github.com/syahmiharith/receipt-to-form/commit/556d3d93ad4be6bb8a889adfc025afa6310c8240) includes regression cases for missing, nullable and malformed provider values. [API tests](tests/api/extract-receipt.test.ts) check the extraction contract; [workflow tests](tests/e2e/expense-workflow.spec.ts) cover corrections and exports.
 
-## Reliability And Security
+[Runtime recovery checks](tests/e2e/runtime-verification.spec.ts) exercise interrupted work and browser-storage failures. Saved-record schema 2 separates image bytes from metadata for WebKit compatibility while preserving existing corrections during migration.
 
-- `GEMINI_API_KEY` is never exposed to the browser.
-- Extraction accepts JPG, PNG, and WEBP on both client and server. ZIP files are opened only in the browser; the API receives selected images individually.
-- Files above 5MB are rejected before extraction.
-- Gemini responses are parsed and validated before reaching the UI.
-- Required fields must be valid before a result becomes downloadable.
-- `Needs attention` results show red field-level validation and inline receipt preview.
-- API failures return machine-readable error codes with safe public messages.
-- Gemini requests use a timeout so the route does not wait indefinitely.
-- Repeated extraction requests are rate limited per client IP.
-- The app logs lifecycle events without logging API keys or image contents.
-- Basic security headers are configured.
+## Run locally
 
-## Testing
-
-Fast CI-style gate:
-
-```bash
-npm run ci
-```
-
-Full deterministic local gate:
-
-```bash
-npm run test:all
-```
-
-Individual checks:
-
-```bash
-npm run lint
-npm run typecheck
-npm run build
-npm run test
-npm run test:e2e
-npm run audit:prod
-```
-
-Live Gemini smoke test:
-
-```bash
-npm run test:e2e:live
-```
-
-The default E2E suite mocks `/api/extract-receipt`, so it is deterministic and does not spend Gemini quota. The live command uses the real API route and should be run before recording the final demo.
-
-See [TESTING.md](./TESTING.md) for the full coverage map.
-
-## Tech Stack
-
-- Next.js App Router
-- React 19
-- TypeScript
-- Tailwind CSS
-- Gemini API
-- Zod
-- Vitest and React Testing Library
-- Playwright
-- GitHub Actions
-- Vercel Analytics and Speed Insights
-
-## Getting Started
-
-Install dependencies:
+Requires Node.js 20.19 or later and npm.
 
 ```bash
 npm install
-```
-
-Create a local environment file:
-
-```bash
 cp .env.example .env.local
-```
-
-Add Gemini configuration:
-
-```bash
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-3.1-flash-lite
-```
-
-Run locally:
-
-```bash
 npm run dev
 ```
 
-Open:
+Open http://localhost:3000. Samples work without a provider call. Live extraction needs server-side Gemini credentials, shared Redis limits and pilot access configuration; see [operations and recovery](docs/operations.md) and [pilot security](docs/SECURITY.md). Never put API keys in browser code.
 
-```text
-http://localhost:3000
+## Check a change
+
+```bash
+npm run ci
+npm run test:e2e
 ```
 
-## Deployment
+The default tests mock extraction for deterministic checks without spending provider quota. Run `npm run test:e2e:live` separately for the real provider path, using synthetic receipts. Mocked tests do not establish extraction accuracy.
 
-1. Push this repository to GitHub.
-2. Import the repository into Vercel.
-3. Add environment variables:
-   - `GEMINI_API_KEY`
-   - `GEMINI_MODEL` optional
-4. Deploy.
-5. Open the production URL and run one live receipt extraction.
+[Testing guide](TESTING.md) · [Release checks](docs/REVIEW_GUIDE.md) · [Demo walkthrough](docs/DEMO_SCRIPT.md) · [API and operations](docs/operations.md)
 
-## Limitations And Next Steps
+## Scope and origin
 
-- Only image receipts are supported; PDF support is intentionally out of scope.
-- Extraction quality depends on receipt clarity and Gemini availability.
-- Receipts and corrections are saved on the current device. Browser storage can be cleared or evicted.
-- Live extraction requires shared Redis limits; samples remain available when extraction is unavailable.
-- Receipts remain account-free and device-local; cross-device synchronization is outside the current scope.
+PDFs and cross-device synchronization are outside the current scope. Data stays on the current device, expires seven days after the last edit and can be evicted by the browser. Live extraction is invite-only and depends on provider availability.
 
-## Project Origin
-
-Originally developed as a recruitment assessment, Receipt-to-Form has evolved into a complete expense workflow. The original development history and MIT license are preserved.
-
-## Expense workflow
-
-Try two synthetic receipts without a provider call. Correct the stationery total against its image and export through **Export → CSV**. Corrections save automatically. Invalid fields exclude the affected receipt until corrected; valid selected receipts export directly. Original extraction confidence remains separate from human changes.
-
-Images, expense fields, line items and queue state are stored in IndexedDB on this device, expiring seven days after the last edit. Browser storage can be evicted. Clear all removes the saved batch. Interrupted requests become manually retryable. **Extract** only sends selected queued or failed receipts; successful results and corrections stay intact. JSON separates current values and items from original extraction and any historical review metadata.
-
-Production live extraction requires `GEMINI_API_KEY` and Redis REST credentials. The Vercel Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically. Explicit `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` values take precedence. The Redis REST service must support EVAL. Reservations enforce 15 requests per IP per UTC minute and a global UTC daily budget, configured with `PROVIDER_DAILY_BUDGET` (default 100). Missing or unavailable budget storage blocks live extraction while samples remain available. Use the deployment platform's trusted proxy headers for client IPs.
-
-Release verification requires the automated checks, deployed sample correction and CSV download, and a separate synthetic real-provider receipt. Roll back the deployment if exports differ from current valid values or storage recovery loses edits. Never log receipt contents.
-
-Pilot evidence is pending. Observe five expense preparers processing three synthetic receipts and opening the CSV in their usual spreadsheet. Record unaided completion counts, errors, time versus manual entry and cleanup. Retest shipped improvements with affected participants and record voluntary return use separately. No participant results are claimed by this release.
-
-Transient provider failures (HTTP 500/502/503/504) get one retry after a short backoff, preserving the initial 45-second timeout and limiting the retry to 10 seconds. Every attempt reserves shared budget before calling Gemini. Unknown, minute, account-wide, zero-allocation and credential limits are not retried. A confirmed positive model-specific daily quota may use one configured Gemini fallback (`GEMINI_FALLBACK_MODEL`, default `gemini-3.1-flash-lite`; empty disables it). The unavailable primary is remembered within a warm server instance until the provider cooldown or Pacific daily reset; cold instances may rediscover the limit. Fallback and transient retry together remain bounded to two provider attempts per request. No other provider, key rotation, billing upgrade or quota increase is performed. Safe quota identifiers and retry delay are logged; raw messages, project identifiers, keys and receipt content are excluded. If both models lack allowance, extraction stops with the provider reset delay rather than cycling through models.
-
-Pin `GEMINI_MODEL=gemini-3.1-flash-lite` as the primary. The legacy 2.5 primary reached its daily allowance and subsequently returned UNAVAILABLE after the reset; the current stable model removes that legacy dependency. An optional `GEMINI_FALLBACK_MODEL` must differ from the primary to be used; leave it empty when no alternate Gemini model is configured. Preview verification returned the correct USD 12.50 and USD 23.75 results for both synthetic receipts. Source identity, original model confidence and CSV values remain covered by the workflow tests.
-
-
-## Runtime verification coverage
-
-Runtime checks cover notes and formula-safe CSV/JSON round trips, keyboard preview focus, interrupted extraction, stop/resume, duplicate files, the five-receipt limit, storage quota failure, unsupported saved records, currency minor units, and legacy saved-data migration. CI runs the expense and runtime recovery checks in mobile WebKit as well as Chromium.
-
-Saved records now use schema version 2 with image bytes in a separate IndexedDB image store. This supports WebKit runtimes that reject persisted Blob/File objects and avoids rewriting image bytes for each field correction. Existing schema-1 records migrate with corrections, review status and source identity retained. Images and queue metadata are committed together, and removed or expired receipts release their stored images.
-
-Deployed browser automation uses Vercel’s `x-vercel-skip-toolbar` header so preview feedback widgets cannot obscure product controls. Live-provider verification records an initial 503 and exercises one explicit user retry when needed. Run live-provider scenarios sequentially to conserve the shared provider allowance.
+Originally developed as a recruitment assessment, the project retains its development history and MIT license. Unfamiliar-user completion and return-use evidence is still pending; no adoption or time-saving results are claimed.

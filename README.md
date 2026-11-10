@@ -21,14 +21,6 @@ Invalid fields exclude the affected receipt until corrected. There is no approva
 
 **Recovery is part of the workflow.** Receipts, images and corrections persist in IndexedDB on the current device. Failed extractions can be retried without replacing successful results or edits.
 
-```text
-Images / ZIP selection → receipt queue → extraction draft
-                                              ↓
-                                  image + editable fields
-                                              ↓
-                                  current CSV / provenance JSON
-```
-
 Gemini handles visual extraction through one server-side API route. Application code validates files and provider output, manages the queue and writes exports. The stack is Next.js, React, TypeScript, Zod and IndexedDB.
 
 ## Maintenance evidence
